@@ -1,0 +1,27 @@
+[project]
+authors = [
+  {name = "I Love Study", email = "ilstudy@qq.com"},
+]
+dependencies = [
+  "opencv-python-headless>=4.9.0.80",
+  "rich>=13.7.1",
+]
+description = "Default template for PDM package"
+license = {text = "LGPL-3.0"}
+name = "py-rotaeno-stablizer-gui"
+readme = "README.md"
+requires-python = ">=3.10"
+version = "0.1.0"
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.dev-dependencies]
+dev = [
+  "viztracer>=0.16.2",
+]
+
+[[tool.pdm.autoexport]]
+filename = "requirements.txt"
+groups = ["default"]
+without-hashes = true
