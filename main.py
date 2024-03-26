@@ -17,7 +17,7 @@ if __name__ == "__main__":
                         "--background-path",
                         type=str,
                         help="歌曲封面照片路径")
-    parser.add_argument("--no-auto_crop",
+    parser.add_argument("--no-auto-crop",
                         action="store_true",
                         help="不将原视频裁切（不是拉伸）到16:9")
     parser.add_argument("--no-circle-crop",
@@ -35,7 +35,6 @@ if __name__ == "__main__":
                         help="平滑参数（参数越高越平滑）默认为3")
     parser.add_argument("input_video", type=str)
     args = parser.parse_args()
-    print(args)
     rotaeno = Rotaeno(rotation_version=args.rotation_version,
                       circle_crop=not args.no_circle_crop,
                       auto_crop=not args.no_auto_crop,
@@ -45,7 +44,7 @@ if __name__ == "__main__":
                       spectrogram_circle=False,
                       window_size=args.window_size)
     input_video = Path(args.input_video)
-    rotaeno.process_video(
+    rotaeno.run(
         input_video,
         input_video.with_stem(input_video.stem + "_out")
         if args.output_video is None else args.output_video)

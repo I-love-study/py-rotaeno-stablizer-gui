@@ -1,4 +1,5 @@
 import os
+import queue
 import subprocess
 from pathlib import Path
 import json
@@ -18,15 +19,18 @@ def get_ffprobe_path() -> str:
 
 
 def audio_copy(audio_from, audio_to):
+    print([
+        get_ffmpeg_path(), "-y", "-i", audio_from, "-i", audio_to,
+        "-map", "0:a", "-map", "1:v", "-c", "copy", audio_to
+    ])
     try:
         pipe = subprocess.Popen([
             get_ffmpeg_path(), "-y", "-i", audio_from, "-i", audio_to,
             "-map", "0:a", "-map", "1:v", "-c", "copy", audio_to
         ],
                                 stderr=subprocess.PIPE)
-        pipe.wait()
-    except:
         _, stderr = pipe.communicate()
+    except:
         raise OSError(stderr)
 
 
@@ -43,6 +47,7 @@ class FFMpegReader:
         self.hope_fps = min(common_fps,
                             key=lambda x: abs(x - self.info["fps"])
                             ) if fps is None and self.is_vfr else fps
+        self.queue = queue.Queue
 
     def get_info(self):
         commands = [
@@ -144,8 +149,9 @@ class FFMpegWriter:
         self.background_image = background_image
         self.bitrate = bitrate
         self.pipe = None
+        self.queue = queue.Queue(5)
 
-    def __enter__(self):
+    def start(self):
         commands = [get_ffmpeg_path(), "-y", "-loglevel", "warning"]
         if self.background_image is not None:
             commands += ["-i", self.background_image]
@@ -175,12 +181,20 @@ class FFMpegWriter:
             bufsize=self.height * self.width * 4 + 1)
         return self
 
-    def write(self, frame: np.ndarray):
+    def write(self):
+        self.start()
         assert self.pipe
         assert self.pipe.stdin
-        assert frame.shape == (self.height, self.width, 4)
-        #print("1")
-        self.pipe.stdin.write(frame)
+        while True:
+            frame = self.queue.get()
+            if frame is None:
+                self.pipe.stdin.close()
+                self.pipe.wait()
+                self.queue.task_done()
+                break
+            assert frame.shape == (self.height, self.width, 4)
+            self.pipe.stdin.write(frame)
+            self.queue.task_done()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         assert self.pipe

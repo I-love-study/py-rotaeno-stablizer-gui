@@ -1,11 +1,13 @@
 import logging
 import math
 import os
+import queue
 import time
 from collections import deque
 from itertools import islice
 from pathlib import Path
 from typing import NamedTuple
+import threading
 
 import cv2
 import numpy as np
@@ -77,6 +79,10 @@ class Rotaeno:
         self.spectrogram_circle = spectrogram_circle
         self.display_all = display_all
         self.height = height
+
+        self.con = get_console()
+        self.read_frame_queue = queue.Queue(5)  # 最多存放5帧
+        self.event = threading.Event()
 
     def generate_background(self, width: int, height: int, r: float,
                             thickness: float) -> np.ndarray:
@@ -245,10 +251,52 @@ class Rotaeno:
             background[translucent] * (1 - mask3[translucent]))"""
         return rotated_frame  #combine_frame
 
-    def process_video(self, input_video: str | os.PathLike,
-                      output_video: str | os.PathLike):
-        con = get_console()
-        with con.status("[1/3]Loading Video...") as status:
+    def process_video(self, output_writer: ffmpeg.FFMpegWriter,
+                      frame_count: int):
+        with Progress(
+                TextColumn(
+                    "[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(), TimeElapsedColumn(),
+                TimeRemainingColumn(), FPSColumn()) as progress:
+            #先给稳定器投喂点数据
+            wakeup_elems = []
+            for _ in range(self.rotation_method.wake_up_num):
+                wakeup_elems.append(self.read_frame_queue.get())
+                self.read_frame_queue.task_done()
+            self.rotation_method.wake_up(wakeup_elems)
+            angle_deque = deque(
+                wakeup_elems, maxlen=self.rotation_method.window_size)
+            task = progress.add_task("Rendering", total=frame_count)
+            while True:
+                f = self.read_frame_queue.get()
+                if f is None:
+                    break
+                angle_deque.append(f)
+                angle = self.rotation_method.update(f)
+                a = self.process_frame(
+                    angle_deque[self.rotation_method.wake_up_num],
+                    angle)
+                output_writer.queue.put(a)
+                progress.advance(task)
+                self.read_frame_queue.task_done()
+            for f in range(self.rotation_method.wake_up_num):
+                output_writer.queue.put(
+                    self.process_frame(angle_deque.popleft(),
+                                       self.rotation_method.update()))
+                progress.advance(task)
+            output_writer.queue.put(None)
+
+    def _read_frame(self, reader: ffmpeg.FFMpegReader):
+        for i in reader.read():
+            if self.event.is_set():
+                raise RuntimeError
+            self.read_frame_queue.put(i)
+        self.read_frame_queue.put(None)
+
+    def run(self, input_video: str | os.PathLike,
+            output_video: str | os.PathLike):
+        with self.con.status("[1/3]Loading Video...") as status:
             input_reader = ffmpeg.FFMpegReader(input_video)
             self.paint_msg = self._get_video_info(
                 input_reader.info["height"],
@@ -266,8 +314,7 @@ class Rotaeno:
             if self.display_all:
                 width, height = self.paint_msg.video_a, self.paint_msg.video_a
             else:
-                width, height = input_reader.info[
-                    "width"], input_reader.info["height"]
+                width, height = self.paint_msg.real_width, self.paint_msg.real_height
             output_writer = ffmpeg.FFMpegWriter(
                 output_video,
                 width=width,
@@ -276,44 +323,27 @@ class Rotaeno:
                 codec="hevc_nvenc",
                 background_image=bg_temp_path)
             status.update("[1/3]Loading Video... Complete")
-        with output_writer as ow, Progress(
-                TextColumn(
-                    "[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(), TimeElapsedColumn(),
-                TimeRemainingColumn(), FPSColumn()) as progress:
-            #先给稳定器投喂点数据
-            read_generator = input_reader.read()
-            wakeup_elems = list(
-                islice(read_generator,
-                       self.rotation_method.wake_up_num))
-            self.rotation_method.wake_up(wakeup_elems)
-            angle_deque = deque(
-                wakeup_elems, maxlen=self.rotation_method.window_size)
-            task = progress.add_task(
-                "Rendering",
-                total=int(input_reader.info["duration"] * fps_output))
-            for f in read_generator:
-                angle_deque.append(f)
-                angle = self.rotation_method.update(f)
-                a = self.process_frame(
-                    angle_deque[self.rotation_method.wake_up_num],
-                    angle)
-                ow.write(a)
-                progress.advance(task)
-            for f in range(self.rotation_method.wake_up_num):
-                ow.write(
-                    self.process_frame(angle_deque.popleft(),
-                                       self.rotation_method.update()))
-                progress.advance(task)
-            status.update("[2/3]Transfering Video... Complete")
+        frame_count = int(input_reader.info["duration"] * fps_output)
+        read_thread = threading.Thread(target=self._read_frame,
+                                       args=(input_reader, ))
+        write_thread = threading.Thread(target=output_writer.write)
+        try:
+            read_thread.start()
+            write_thread.start()
+
+            # 处理视频帧
+            self.process_video(output_writer, frame_count)
+        except:
+            self.event.set()
+            read_thread.join()
+            output_writer.queue.put(None)
+            return
+        finally:
+            write_thread.join()
         # 删了临时文件
         bg_temp_path.unlink()
-        with con.status("[3/3]Coping audio") as status:
+        with self.con.status("[3/3]Coping audio") as status:
             ffmpeg.audio_copy(input_video, output_video)
-
-    def run(self):
-        ...
 
 
 if __name__ == "__main__":
@@ -324,4 +354,4 @@ if __name__ == "__main__":
         display_all=True,
         window_size=5)
 
-    a.process_video("test.mp4", "test_a.mp4")
+    a.run("test.mp4", "test_a.mp4")
