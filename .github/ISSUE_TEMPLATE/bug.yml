@@ -1,0 +1,68 @@
+name: Bug 报告
+description: 有关软件相关的 Bug
+title: "[ Bug ] 在此输入标题"
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        在提交该 Issue 之前，请确保：
+        + 先前不存在相同的 Issue
+        + 你已经阅读完相关文档，并且文档并不能帮你解决问题
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug 描述
+      description: 简明扼要地描述该错误是什么。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce-steps
+    attributes:
+      label: 复现步骤
+      description: 重现这一行为的步骤。
+      value: |
+        例如 :
+        1. 使用
+        2. 点击'....'
+        3. 向下滚动到'....'
+        4. 看到错误
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: 期望行为
+      description: 清晰而简明地描述你所期望发生的事情。
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: 截图 / 相关视频
+      description: 请上传最小复现视频源文件 / 图片，以便帮助我们能够快速定位问题。
+      value: 
+  - type: input
+    id: stablizer-version
+    attributes:
+      label: 稳定器版本
+      placeholder: "例: 0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: gaming-device
+    attributes:
+      label: 游玩设备
+      placeholder: "例: iPad Pro 2018"
+    validations:
+      required: true
+  - type: input
+    id: ncm-patch-version
+    attributes:
+      label: Rotaeno 版本
+      placeholder: "例: 1.15.0"
+  - type: textarea
+    id: extra-info
+    attributes:
+      label: 补充
+      description: 在此添加关于该问题的任何其他信息。
