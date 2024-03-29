@@ -18,7 +18,9 @@ distribution = false
 
 [tool.pdm.dev-dependencies]
 dev = [
-  "viztracer>=0.16.2",
+    "viztracer>=0.16.2",
+    "nuitka>=2.1.3",
+    "yapf>=0.40.2",
 ]
 
 [[tool.pdm.autoexport]]

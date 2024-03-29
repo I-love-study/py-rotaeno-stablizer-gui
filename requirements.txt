@@ -3,4 +3,3 @@
 
 opencv-python-headless>=4.9.0.80
 rich>=13.7.1
-viztracer>=0.16.2

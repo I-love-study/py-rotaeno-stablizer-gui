@@ -31,13 +31,13 @@ jobs:
         cache: 'pip'
     
     - name: Install opencv-python-headless(With only core imgproc and imgcodecs)
-      run: /
+      run: |
         mv opencv-python/setup.py opencv-python/setup-original.py
         mv opencv-setup-hack.py opencv-python/setup.py
         pip install ./opencv-python
     
     - name: Pip install
-      run: /
+      run: |
         pip install -r requirements.txt
   
     - uses: Nuitka/Nuitka-Action@main

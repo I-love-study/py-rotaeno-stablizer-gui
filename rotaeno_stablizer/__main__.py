@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from rotaeno_stablizer import Rotaeno
+from . import Rotaeno
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

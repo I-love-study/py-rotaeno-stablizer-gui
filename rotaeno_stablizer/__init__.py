@@ -1,10 +1,9 @@
 import logging
 import math
-import os
+from os import PathLike
 import queue
 import time
 from collections import deque
-from itertools import islice
 from pathlib import Path
 from typing import NamedTuple
 import threading
@@ -56,7 +55,7 @@ class Rotaeno:
                  auto_crop: bool = True,
                  display_all: bool = True,
                  height: int | None = None,
-                 background_path: str | os.PathLike | None = None,
+                 background_path: str | PathLike | None = None,
                  spectrogram_circle: bool = False,
                  window_size: int = 3):
         """_summary_
@@ -67,7 +66,7 @@ class Rotaeno:
             auto_crop (bool, optional): 将输入视频裁切成 16:9. Defaults to True.
             display_all (bool, optional): 是否适当缩小视频以保证所有都能看到，开启后视频比例会变为 1:1. Defaults to True.
             height (int | None, optional): 输出视频高度，如为 None，则将由软件自行设置. Defaults to None.
-            background (os.PathLike | None, optional): 背景，默认为纯黑背景. Defaults to None.
+            background (PathLike | None, optional): 背景，默认为纯黑背景. Defaults to None.
             spectrogram_circle (bool, optional): 是否需要带有频谱图的圆圈. Defaults to False.
         """
 
@@ -294,8 +293,8 @@ class Rotaeno:
             self.read_frame_queue.put(i)
         self.read_frame_queue.put(None)
 
-    def run(self, input_video: str | os.PathLike,
-            output_video: str | os.PathLike):
+    def run(self, input_video: str | PathLike,
+            output_video: str | PathLike):
         with self.con.status("[1/3]Loading Video...") as status:
             input_reader = ffmpeg.FFMpegReader(input_video)
             self.paint_msg = self._get_video_info(

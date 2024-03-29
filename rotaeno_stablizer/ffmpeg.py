@@ -1,4 +1,4 @@
-import os
+from os import PathLike
 import queue
 import subprocess
 from pathlib import Path
@@ -37,7 +37,7 @@ def audio_copy(audio_from, audio_to):
 class FFMpegReader:
 
     def __init__(self,
-                 input_name: str | os.PathLike,
+                 input_name: str | PathLike,
                  fps: int | None = None) -> None:
         self.input_file = Path(input_name)
         #self.is_vfr = self.vfr_check()
@@ -131,14 +131,14 @@ class FFMpegWriter:
 
     def __init__(
             self,
-            output_video: str | os.PathLike,
+            output_video: str | PathLike,
             width: int,
             height: int,
             fps: float,
             pix_fmt: str = "yuv420p",
             codec: str = "libx265",
             bitrate: str = "8M",
-            background_image: str | os.PathLike | None = None
+            background_image: str | PathLike | None = None
     ) -> None:
         self.output_video = output_video
         self.height = height
