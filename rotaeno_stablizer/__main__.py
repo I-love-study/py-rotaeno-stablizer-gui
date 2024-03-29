@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from . import Rotaeno
+from rotaeno_stablizer import Rotaeno
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -26,13 +26,16 @@ if __name__ == "__main__":
     parser.add_argument("--no-display-all",
                         action="store_true",
                         help="不输出正方形版本")
-    parser.add_argument("--height",
-                        type=int,
-                        help="输出视频高度，默认不选")
+    parser.add_argument("--height", type=int, help="输出视频高度，默认不选")
     parser.add_argument("--window-size",
                         type=int,
                         default=3,
                         help="平滑参数（参数越高越平滑）默认为3")
+    parser.add_argument("-c",
+                        "--codec",
+                        type=str,
+                        default="hevc_nvenc",
+                        help="输出视频所使用的编码器 默认为 hevc_nvenc")
     parser.add_argument("input_video", type=str)
     args = parser.parse_args()
     rotaeno = Rotaeno(rotation_version=args.rotation_version,
@@ -46,5 +49,5 @@ if __name__ == "__main__":
     input_video = Path(args.input_video)
     rotaeno.run(
         input_video,
-        input_video.with_stem(input_video.stem + "_out")
-        if args.output_video is None else args.output_video)
+        input_video.with_stem(input_video.stem + "_out") if
+        args.output_video is None else args.output_video, args.codec)

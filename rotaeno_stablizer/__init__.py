@@ -294,7 +294,7 @@ class Rotaeno:
         self.read_frame_queue.put(None)
 
     def run(self, input_video: str | PathLike,
-            output_video: str | PathLike):
+            output_video: str | PathLike, codec: str):
         with self.con.status("[1/3]Loading Video...") as status:
             input_reader = ffmpeg.FFMpegReader(input_video)
             self.paint_msg = self._get_video_info(
@@ -319,7 +319,7 @@ class Rotaeno:
                 width=width,
                 height=height,
                 fps=fps_output,
-                codec="hevc_nvenc",
+                codec=codec,
                 background_image=bg_temp_path)
             status.update("[1/3]Loading Video... Complete")
         frame_count = int(input_reader.info["duration"] * fps_output)
