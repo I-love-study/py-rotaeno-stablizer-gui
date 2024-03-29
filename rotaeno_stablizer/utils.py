@@ -18,7 +18,7 @@ def paste_image(background_image: np.ndarray,
                 foreground_image: np.ndarray, offset_x: int,
                 offset_y: int):
     # 确定前景图像在背景图像上的位置
-    
+
     # 计算粘贴的区域
     if offset_x < 0:
         offset_x_start = None

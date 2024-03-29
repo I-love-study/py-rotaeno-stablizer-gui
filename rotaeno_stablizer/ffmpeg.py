@@ -1,37 +1,56 @@
-from os import PathLike
-import queue
-import subprocess
-from pathlib import Path
 import json
-import re
 import logging
+import queue
+import re
+import subprocess
+from os import PathLike
+from pathlib import Path
+from shutil import which
+
 import numpy as np
 
 log = logging.getLogger()
 
 
-def get_ffmpeg_path() -> str:
+def get_ffmpeg():
+    """获取本机拥有的编解码器"""
+    if which("ffmpeg"):
+        return "ffmpeg"
+    elif Path("ffmpeg/ffmpeg.exe").exists():
+        return "ffmpeg/ffmpeg.exe"
+
+    Warning("Couldn't find ffmpeg, maybe it'll not work")
     return "ffmpeg"
 
 
-def get_ffprobe_path() -> str:
+def get_ffprobe():
+    """获取本机拥有的编解码器"""
+    if which("ffprobe"):
+        return "ffprobe"
+    elif Path("ffmpeg/ffprobe.exe").exists():
+        return "ffmpeg/ffprobe.exe"
+
+    Warning("Couldn't find ffprobe, maybe it'll not work")
     return "ffprobe"
 
 
 def audio_copy(audio_from, audio_to):
     print([
-        get_ffmpeg_path(), "-y", "-i", audio_from, "-i", audio_to,
-        "-map", "0:a", "-map", "1:v", "-c", "copy", audio_to
+        get_ffmpeg(), "-y", "-i", audio_from, "-i", audio_to, "-map",
+        "0:a", "-map", "1:v", "-c", "copy", audio_to
     ])
+    stderr = None
     try:
         pipe = subprocess.Popen([
-            get_ffmpeg_path(), "-y", "-i", audio_from, "-i", audio_to,
+            get_ffmpeg(), "-y", "-i", audio_from, "-i", audio_to,
             "-map", "0:a", "-map", "1:v", "-c", "copy", audio_to
         ],
                                 stderr=subprocess.PIPE)
         _, stderr = pipe.communicate()
-    except:
-        raise OSError(stderr)
+    except Exception as e:
+        if stderr is None:
+            raise e
+        raise OSError(stderr) from e
 
 
 class FFMpegReader:
@@ -51,8 +70,8 @@ class FFMpegReader:
 
     def get_info(self):
         commands = [
-            get_ffprobe_path(), "-v", "quiet", "-print_format",
-            "json", "-show_streams", self.input_file
+            get_ffprobe(), "-v", "quiet", "-print_format", "json",
+            "-show_streams", self.input_file
         ]
         pipe = subprocess.Popen(commands,
                                 stdout=subprocess.PIPE,
@@ -81,7 +100,7 @@ class FFMpegReader:
 
     def vfr_check(self):
         commands = [
-            get_ffmpeg_path(), "-i", self.input_file, "-vf", "vfrdet",
+            get_ffmpeg(), "-i", self.input_file, "-vf", "vfrdet",
             "-an", "-f", "null", "-"
         ]
         pipe = subprocess.Popen(commands, stderr=subprocess.PIPE)
@@ -94,8 +113,7 @@ class FFMpegReader:
 
     def read(self, resize: tuple[int, int] | None = None):
         commands = [
-            get_ffmpeg_path(), "-loglevel", "error", "-i",
-            self.input_file
+            get_ffmpeg(), "-loglevel", "error", "-i", self.input_file
         ]
         if self.hope_fps is not None:
             commands += ["-vf", "fps=" + str(self.hope_fps)]
@@ -138,8 +156,7 @@ class FFMpegWriter:
             pix_fmt: str = "yuv420p",
             codec: str = "libx265",
             bitrate: str = "8M",
-            background_image: str | PathLike | None = None
-    ) -> None:
+            background_image: str | PathLike | None = None) -> None:
         self.output_video = output_video
         self.height = height
         self.width = width
@@ -152,7 +169,7 @@ class FFMpegWriter:
         self.queue = queue.Queue(5)
 
     def start(self):
-        commands = [get_ffmpeg_path(), "-y", "-loglevel", "warning"]
+        commands = [get_ffmpeg(), "-y", "-loglevel", "warning"]
         if self.background_image is not None:
             commands += ["-i", self.background_image]
         commands += [

@@ -40,12 +40,16 @@ Still in WIP
 
 ### 直接下载
 
-WIP
+> [!IMPORTANT]
+> 因为 `libx264`、`libx265` 要求 GPL-3.0 协议，而本仓库为 LGPL-3.0
+> 所以 Release 中的 `with-ffmpeg` 将使用 LGPL-3.0 协议的 `ffmpeg`
+
+从 Github Action 下载最新版本
 
 ### 命令行
 
 > [!IMPORTANT]
-> 请确保你安装了 `Git` 和 `python`，且将其放置在环境变量中
+> 请确保你安装了 `Git`, `python` 和 `ffmpeg`，且将其放置在环境变量中
 
 ```bash
 git clone https://github.com/I-love-study/py-rotaeno-stablizer-gui.git
