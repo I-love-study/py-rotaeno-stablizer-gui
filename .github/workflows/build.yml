@@ -2,12 +2,12 @@ name: Build & Publish
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
 
 jobs:
-  build_wheels:
+  build_exe:
     name: Build standlone
     runs-on: windows-latest
 
