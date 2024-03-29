@@ -27,7 +27,10 @@ jobs:
     #- name: Install UPX
     #  run: |
     #    choco install upx
-  
+    
+    - name: Install nasm (for libjpeg-turbo in opencv-python)
+      uses: ilammy/setup-nasm@v1
+
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
@@ -44,7 +47,7 @@ jobs:
       run: |
         mv opencv-python/setup.py opencv-python/setup-original.py
         mv standalone_tools/opencv-setup-hack.py opencv-python/setup.py
-        pip install ./opencv-python --force-reinstall
+        pip install ./opencv-python --force-reinstall --verbose
 
     - uses: Nuitka/Nuitka-Action@main
       with:
