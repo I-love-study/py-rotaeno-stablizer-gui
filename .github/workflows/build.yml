@@ -23,6 +23,11 @@ jobs:
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v2
 
+    # 使用UPX会使得内存占用增加 ~100Mb
+    #- name: Install UPX
+    #  run: |
+    #    choco install upx
+  
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
@@ -30,21 +35,25 @@ jobs:
         architecture: 'x64'
         cache: 'pip'
     
-    - name: Install opencv-python-headless(With only core imgproc and imgcodecs)
-      run: |
-        mv opencv-python/setup.py opencv-python/setup-original.py
-        mv opencv-setup-hack.py opencv-python/setup.py
-        pip install ./opencv-python
-    
     - name: Pip install
       run: |
         pip install -r requirements.txt
-  
+      
+      # 使用精简版 opencv-python-headless 强制覆盖
+    - name: Install opencv-python-headless(With only core imgproc and imgcodecs)
+      run: |
+        mv opencv-python/setup.py opencv-python/setup-original.py
+        mv standalone_tools/opencv-setup-hack.py opencv-python/setup.py
+        pip install ./opencv-python --force-reinstall
+
     - uses: Nuitka/Nuitka-Action@main
       with:
         nuitka-version: main
         script-name: rotaeno_stablizer
         standalone: true
+        onefile: false
+        #enable-plugins: upx
+
 
     - name: Turn dist to 7z file
       run: |
