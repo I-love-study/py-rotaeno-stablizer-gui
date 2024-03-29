@@ -60,14 +60,14 @@ jobs:
 
     - name: Turn dist to 7z file
       run: |
-        7z a -t7z rotaeno_stablizer.7z -mx=9 ./rotaeno_stablizer.dist
+        7z a -t7z rotaeno_stablizer.7z -mx=9 ./build/rotaeno_stablizer.dist
 
     - name: get ffmpeg with lgpl
       run: |
         wget https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip
         7z x ffmpeg-master-latest-win64-lgpl-shared.zip ffmpeg-master-latest-win64-lgpl-shared/bin/*
-        mv ffmpeg-master-latest-win64-lgpl-shared/bin rotaeno_stablizer.dist/ffmpeg
-        7z a -t7z rotaeno_stablizer_with_ffmpeg.7z -mx=9 ./rotaeno_stablizer.dist
+        mv ffmpeg-master-latest-win64-lgpl-shared/bin build/rotaeno_stablizer.dist/ffmpeg
+        7z a -t7z rotaeno_stablizer_with_ffmpeg.7z -mx=9 ./build/rotaeno_stablizer.dist
   
 
     - uses: actions/upload-artifact@v4
