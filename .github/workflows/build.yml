@@ -1,0 +1,55 @@
+name: Build & Publish
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build_wheels:
+    name: Build standlone
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Checkout opencv-python
+      uses: actions/checkout@v4
+      with:
+        repository: opencv/opencv-python
+        path: opencv-python
+  
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        architecture: 'x64'
+        cache: 'pip'
+    
+    - name: Install opencv-python-headless(With only core imgproc and imgcodecs)
+      run: /
+        mv opencv-python/setup.py opencv-python/setup-original.py
+        mv opencv-setup-hack.py opencv-python/setup.py
+        pip install ./opencv-python
+    
+    - name: Pip install
+      run: /
+        pip install -r requirements.txt
+  
+    - uses: Nuitka/Nuitka-Action@main
+      with:
+        nuitka-version: main
+        script-name: rotaeno_stablizer
+        standalone: true
+
+    - uses: edgarrc/action-7z@v1
+      with:
+        args: 7z a -t7z rotaeno_stablizer.7z -mx=9 ./rotaeno_stablizer.dist
+
+    - uses: actions/upload-artifact@v4
+      with:
+        path: ./rotaeno_stablizer.7z
