@@ -64,7 +64,7 @@ jobs:
 
     - name: get ffmpeg with lgpl
       run: |
-        wget https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip
+        curl -JLO https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl-shared.zip
         7z x ffmpeg-master-latest-win64-lgpl-shared.zip ffmpeg-master-latest-win64-lgpl-shared/bin/*
         mv ffmpeg-master-latest-win64-lgpl-shared/bin build/rotaeno_stablizer.dist/ffmpeg
         7z a -t7z rotaeno_stablizer_with_ffmpeg.7z -mx=9 ./build/rotaeno_stablizer.dist
