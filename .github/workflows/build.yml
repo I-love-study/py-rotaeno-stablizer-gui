@@ -38,16 +38,17 @@ jobs:
         architecture: 'x64'
         cache: 'pip'
     
+    # 把 opencv-python-headless 从 requirements.txt 中先去掉再安装
     - name: Pip install
       run: |
-        pip install -r requirements.txt
+        grep -v 'opencv-python-headless' requirements.txt | xargs pip install
       
-      # 使用精简版 opencv-python-headless 强制覆盖
+      # 使用精简版 opencv-python-headless
     - name: Install opencv-python-headless(With only core imgproc and imgcodecs)
       run: |
         mv opencv-python/setup.py opencv-python/setup-original.py
         mv standalone_tools/opencv-setup-hack.py opencv-python/setup.py
-        pip install ./opencv-python --force-reinstall --verbose
+        pip install ./opencv-python --verbose
 
     - uses: Nuitka/Nuitka-Action@main
       with:
@@ -57,6 +58,9 @@ jobs:
         onefile: false
         #enable-plugins: upx
 
+    - name: Move config.toml to dist
+      run: |
+        mv config.toml ./build/rotaeno_stablizer.dist/config.toml
 
     - name: Turn dist to 7z file
       run: |

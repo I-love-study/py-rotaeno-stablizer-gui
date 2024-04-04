@@ -1,6 +1,8 @@
 from rich.progress import ProgressColumn, Task
 from rich.text import Text
+from rich import get_console
 import numpy as np
+import sys
 
 
 class FPSColumn(ProgressColumn):
@@ -54,3 +56,43 @@ def paste_image(background_image: np.ndarray,
             offset_y_fore_start:offset_y_fore_end,
             offset_x_fore_start:offset_x_fore_end, :]
     return background_image
+
+
+if sys.platform == "win32":
+    from msvcrt import getch as msvc_getch
+    def getch() -> str:
+        return msvc_getch().decode(errors="replace")
+else:
+
+    def getch() -> str:
+        import sys
+        import tty
+        import termios
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            return sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
+def ask_confirm(text: str, default=True) -> bool:
+    while True:
+        console = get_console()
+        options = "([y]/n)" if default else "(y/[n])"
+        console.print(Text(text),
+                    Text(options, style="prompt.choices"),
+                    Text(": "),
+                    end="")
+        get = getch().lower()
+        print(["n", "y"][default] if get in "\r\n" else get)
+        if get in "\r\n":
+            return default
+        elif get == "y":
+            return True
+        elif get == "n":
+            return False
+        console.print("[prompt.invalid]Please enter Y or N")
+
+    
