@@ -7,6 +7,7 @@ from collections import deque
 from pathlib import Path
 from typing import NamedTuple
 import threading
+import urllib.request
 
 import cv2
 import numpy as np
@@ -55,7 +56,7 @@ class Rotaeno:
                  auto_crop: bool = True,
                  display_all: bool = True,
                  height: int | None = None,
-                 background_path: str | PathLike | None = None,
+                 background: str | PathLike | None = None,
                  spectrogram_circle: bool = False,
                  window_size: int = 3):
         """_summary_
@@ -74,10 +75,20 @@ class Rotaeno:
                                             window_size)
         self.circle_crop = circle_crop
         self.auto_crop = auto_crop
-        self.background_path = background_path
         self.spectrogram_circle = spectrogram_circle
         self.display_all = display_all
         self.height = height
+
+        if isinstance(background,
+                      str) and background.startswith("http"):
+            r = urllib.request.urlopen(background)
+            background_data = np.fromstring(r.read, np.uint8)
+            self.background = cv2.imdecode(background_data, 1)
+        elif background is not None:
+            background_data = np.fromfile(background, dtype=np.uint8)
+            self.background = cv2.imdecode(background_data, 1)
+        else:
+            self.background = None
 
         self.con = get_console()
         self.read_frame_queue = queue.Queue(5)  # 最多存放5帧
@@ -88,11 +99,9 @@ class Rotaeno:
 
         brightness = 0.2
         background_np = np.zeros((height, width, 3), dtype=np.uint8)
-        if self.background_path is not None:
+        if self.background is not None:
             # 为了支持中文路径的操作
-            background: np.ndarray = cv2.imdecode(
-                np.fromfile(self.background_path, dtype=np.uint8), 1)
-            background = cv2.resize(background,
+            background = cv2.resize(self.background,
                                     (int(r * 2), int(r * 2)))
             background = (background * brightness).astype(np.uint8)
 
@@ -294,7 +303,7 @@ class Rotaeno:
         self.read_frame_queue.put(None)
 
     def run(self, input_video: str | PathLike,
-            output_video: str | PathLike, codec: str):
+            output_video: str | PathLike, codec: str, bitrate: str):
         with self.con.status("[1/3]Loading Video...") as status:
             input_reader = ffmpeg.FFMpegReader(input_video)
             self.paint_msg = self._get_video_info(
@@ -320,6 +329,7 @@ class Rotaeno:
                 height=height,
                 fps=fps_output,
                 codec=codec,
+                bitrate=bitrate,
                 background_image=bg_temp_path)
             status.update("[1/3]Loading Video... Complete")
         frame_count = int(input_reader.info["duration"] * fps_output)
@@ -333,6 +343,7 @@ class Rotaeno:
             # 处理视频帧
             self.process_video(output_writer, frame_count)
         except:
+            # 把 Read 给炸了
             self.event.set()
             read_thread.join()
             output_writer.queue.put(None)
