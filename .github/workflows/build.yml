@@ -63,6 +63,11 @@ jobs:
       run: |
         mv config.toml ./build/rotaeno_stablizer.dist/config.toml
 
+    - uses: actions/upload-artifact@v4
+      with:
+        path: |
+          ./rotaeno_stablizer.7z
+
     - name: Turn dist to 7z file
       run: |
         7z a -t7z rotaeno_stablizer.7z -mx=9 ./build/rotaeno_stablizer.dist
@@ -74,9 +79,7 @@ jobs:
         mv ffmpeg-master-latest-win64-lgpl-shared/bin build/rotaeno_stablizer.dist/ffmpeg
         7z a -t7z rotaeno_stablizer_with_ffmpeg.7z -mx=9 ./build/rotaeno_stablizer.dist
   
-
     - uses: actions/upload-artifact@v4
       with:
         path: |
-          ./rotaeno_stablizer.7z
           ./rotaeno_stablizer_with_ffmpeg.7z
