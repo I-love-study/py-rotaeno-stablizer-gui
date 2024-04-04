@@ -76,24 +76,19 @@ python -m rotaeno_stablizer [options] input_video.mp4 ouput_video.mp4
 
 或者直接双击，将会得到以下文字
 
-<style>
-.r1 {color: #808000; text-decoration-color: #808000; font-weight: bold}
-.r2 {color: #800080; text-decoration-color: #800080; font-weight: bold}
-.r3 {color: #008080; text-decoration-color: #008080; font-weight: bold}
-</style>
 <pre style="font-family:Menlo,'DejaVu Sans Mono',consolas,sans-serif, monospace; background-color:#171b22">
 <code style="font-family:inherit; background-color:#171b22">请输入原始文件:
-输出文件： <span class="r1">test_out.mp4</span>
-请选择直播模式版本 <span class="r2">[1/2]</span> <span class="r3">(2)</span>:
-是否自动裁切成16:9 <span class="r2">([y]/n)</span> :
-是否使用圆形切环 <span class="r2">([y]/n)</span> :
-是否输出正方形版本 <span class="r2">([y]/n)</span> :
-是否自动裁切成16:9 <span class="r2">([y]/n)</span> :
-是否需要背景图片 <span class="r2">([y]/n)</span> :
-请输入背景图片路径: 请输入平滑参数： <span class="r3">(3)</span>:
-请输入输出视频高度（0 为系统自动选择） <span class="r3">(0)</span>:
-请选择输出视频编码器 <span class="r3">(hevc_nvenc)</span>:
-请选择输出视频比特率 <span class="r3">(8m)</span>: </code></pre>
+输出文件： <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">test_out.mp4</span>
+请选择直播模式版本 <span style="color: #800080; text-decoration-color: #800080; font-weight: bold">[1/2]</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">(2)</span>:
+是否自动裁切成16:9 <span style="color: #800080; text-decoration-color: #800080; font-weight: bold">([y]/n)</span> :
+是否使用圆形切环 <span style="color: #800080; text-decoration-color: #800080; font-weight: bold">([y]/n)</span> :
+是否输出正方形版本 <span style="color: #800080; text-decoration-color: #800080; font-weight: bold">([y]/n)</span> :
+是否自动裁切成16:9 <span style="color: #800080; text-decoration-color: #800080; font-weight: bold">([y]/n)</span> :
+是否需要背景图片 <span style="color: #800080; text-decoration-color: #800080; font-weight: bold">([y]/n)</span> :
+请输入背景图片路径: 请输入平滑参数： <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">(3)</span>:
+请输入输出视频高度（0 为系统自动选择） <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">(0)</span>:
+请选择输出视频编码器 <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">(hevc_nvenc)</span>:
+请选择输出视频比特率 <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">(8m)</span>: </code></pre>
 
 ### 半 GUI 办法
 
@@ -105,46 +100,37 @@ WIP
 
 ## Help Usage
 
-<style>
-.r1 {color: #0000ff; text-decoration-color: #0000ff; text-decoration: underline}
-.r2 {color: #ff8700; text-decoration-color: #ff8700}
-.r3 {color: #808080; text-decoration-color: #808080}
-.r4 {color: #008080; text-decoration-color: #008080}
-.r5 {color: #00af87; text-decoration-color: #00af87}
-.r6 {color: #ffffff; text-decoration-color: #ffffff}
-.r7 {color: #008080; text-decoration-color: #008080; font-style: italic}
-</style>
 <pre style="font-family:Menlo,'DejaVu Sans Mono',consolas,sans-serif, monospace; background-color:#171b22">
-<code style="font-family:inherit; background-color:#171b22">PY Rotaeno Stablizer: <span class="r1">https://github.com/I-love-study/py-rotaeno-stablizer-gui</span>
+<code style="font-family:inherit; background-color:#171b22">PY Rotaeno Stablizer: <span style="color: #0000ff; text-decoration-color: #0000ff; text-decoration: underline">https://github.com/I-love-study/py-rotaeno-stablizer-gui</span>
 
-<span class="r2">Usage:</span> <span class="r3">__main__.py</span> [<span class="r4">-h</span>] [<span class="r4">-o</span> <span class="r5">OUTPUT_VIDEO</span>] [<span class="r4">--rotation-version</span> <span class="r5">ROTATION_VERSION</span>] [<span class="r4">-bg</span> <span class="r5">BACKGROUND</span>] [<span class="r4">--auto-crop</span> | <span class="r4">--no-auto-crop</span>] [<span class="r4">--circle-crop</span> | <span class="r4">--no-circle-crop</span>]
-                   [<span class="r4">--display-all</span> | <span class="r4">--no-display-all</span>] [<span class="r4">--height</span> <span class="r5">HEIGHT</span>] [<span class="r4">--window-size</span> <span class="r5">WINDOW_SIZE</span>] [<span class="r4">-c</span> <span class="r5">CODEC</span>] [<span class="r4">-b</span> <span class="r5">BITRATE</span>]
-                   [<span class="r4">input_video</span>]
+<span style="color: #ff8700; text-decoration-color: #ff8700">Usage:</span> <span style="color: #808080; text-decoration-color: #808080">__main__.py</span> [<span style="color: #008080; text-decoration-color: #008080">-h</span>] [<span style="color: #008080; text-decoration-color: #008080">-o</span> <span style="color: #00af87; text-decoration-color: #00af87">OUTPUT_VIDEO</span>] [<span style="color: #008080; text-decoration-color: #008080">--rotation-version</span> <span style="color: #00af87; text-decoration-color: #00af87">ROTATION_VERSION</span>] [<span style="color: #008080; text-decoration-color: #008080">-bg</span> <span style="color: #00af87; text-decoration-color: #00af87">BACKGROUND</span>] [<span style="color: #008080; text-decoration-color: #008080">--auto-crop</span> | <span style="color: #008080; text-decoration-color: #008080">--no-auto-crop</span>] [<span style="color: #008080; text-decoration-color: #008080">--circle-crop</span> | <span style="color: #008080; text-decoration-color: #008080">--no-circle-crop</span>]
+                   [<span style="color: #008080; text-decoration-color: #008080">--display-all</span> | <span style="color: #008080; text-decoration-color: #008080">--no-display-all</span>] [<span style="color: #008080; text-decoration-color: #008080">--height</span> <span style="color: #00af87; text-decoration-color: #00af87">HEIGHT</span>] [<span style="color: #008080; text-decoration-color: #008080">--window-size</span> <span style="color: #00af87; text-decoration-color: #00af87">WINDOW_SIZE</span>] [<span style="color: #008080; text-decoration-color: #008080">-c</span> <span style="color: #00af87; text-decoration-color: #00af87">CODEC</span>] [<span style="color: #008080; text-decoration-color: #008080">-b</span> <span style="color: #00af87; text-decoration-color: #00af87">BITRATE</span>]
+                   [<span style="color: #008080; text-decoration-color: #008080">input_video</span>]
 
-<span class="r6">Rotaeno</span>
+<span style="color: #ffffff; text-decoration-color: #ffffff">Rotaeno</span>
 
-<span class="r2">Positional Arguments:</span>
-  <span class="r4">input_video</span>
+<span style="color: #ff8700; text-decoration-color: #ff8700">Positional Arguments:</span>
+  <span style="color: #008080; text-decoration-color: #008080">input_video</span>
 
-<span class="r2">Options:</span>
-  <span class="r4">-h</span>, <span class="r4">--help</span>            <span class="r6">帮助</span><span class="r4"> (默认为 </span><span class="r7">False</span><span class="r4">)</span>
-  <span class="r4">-o</span>, <span class="r4">--output-video</span> <span class="r5">OUTPUT_VIDEO</span>
-  <span class="r4">--rotation-version</span> <span class="r5">ROTATION_VERSION</span>
-                        <span class="r6">直播模式版本</span><span class="r4"> (默认为 </span><span class="r7">2</span><span class="r4">)</span>
-  <span class="r4">-bg</span>, <span class="r4">--background</span> <span class="r5">BACKGROUND</span>
-                        <span class="r6">歌曲封面照片路径</span><span class="r4"> (默认为 </span><span class="r7">None</span><span class="r4">)</span>
-  <span class="r4">--auto-crop</span>, <span class="r4">--no-auto-crop</span>
-                        <span class="r6">将原视频裁切（不是拉伸）到16:9</span><span class="r4"> (默认为 </span><span class="r7">True</span><span class="r4">)</span>
-  <span class="r4">--circle-crop</span>, <span class="r4">--no-circle-crop</span>
-                        <span class="r6">使用圆形切环</span><span class="r4"> (默认为 </span><span class="r7">True</span><span class="r4">)</span>
-  <span class="r4">--display-all</span>, <span class="r4">--no-display-all</span>
-                        <span class="r6">输出正方形版本</span><span class="r4"> (默认为 </span><span class="r7">True</span><span class="r4">)</span>
-  <span class="r4">--height</span> <span class="r5">HEIGHT</span>       <span class="r6">输出视频高度</span><span class="r4"> (默认为 </span><span class="r7">0</span><span class="r4">)</span>
-  <span class="r4">--window-size</span> <span class="r5">WINDOW_SIZE</span>
-                        <span class="r6">平滑参数（参数越高越平滑）</span><span class="r4"> (默认为 </span><span class="r7">3</span><span class="r4">)</span>
-  <span class="r4">-c</span>, <span class="r4">--codec</span> <span class="r5">CODEC</span>     <span class="r6">输出视频所使用的编码器</span><span class="r4"> (默认为 </span><span class="r7">hevc_nvenc</span><span class="r4">)</span>
-  <span class="r4">-b</span>, <span class="r4">--bitrate</span> <span class="r5">BITRATE</span>
-                        <span class="r6">输出视频码率（不包含音频）</span><span class="r4"> (默认为 </span><span class="r7">8m</span><span class="r4">)</span>
+<span style="color: #ff8700; text-decoration-color: #ff8700">Options:</span>
+  <span style="color: #008080; text-decoration-color: #008080">-h</span>, <span style="color: #008080; text-decoration-color: #008080">--help</span>            <span style="color: #ffffff; text-decoration-color: #ffffff">帮助</span><span style="color: #008080; text-decoration-color: #008080"> (默认为 </span><span style="color: #008080; text-decoration-color: #008080; font-style: italic">False</span><span style="color: #008080; text-decoration-color: #008080">)</span>
+  <span style="color: #008080; text-decoration-color: #008080">-o</span>, <span style="color: #008080; text-decoration-color: #008080">--output-video</span> <span style="color: #00af87; text-decoration-color: #00af87">OUTPUT_VIDEO</span>
+  <span style="color: #008080; text-decoration-color: #008080">--rotation-version</span> <span style="color: #00af87; text-decoration-color: #00af87">ROTATION_VERSION</span>
+                        <span style="color: #ffffff; text-decoration-color: #ffffff">直播模式版本</span><span style="color: #008080; text-decoration-color: #008080"> (默认为 </span><span style="color: #008080; text-decoration-color: #008080; font-style: italic">2</span><span style="color: #008080; text-decoration-color: #008080">)</span>
+  <span style="color: #008080; text-decoration-color: #008080">-bg</span>, <span style="color: #008080; text-decoration-color: #008080">--background</span> <span style="color: #00af87; text-decoration-color: #00af87">BACKGROUND</span>
+                        <span style="color: #ffffff; text-decoration-color: #ffffff">歌曲封面照片路径</span><span style="color: #008080; text-decoration-color: #008080"> (默认为 </span><span style="color: #008080; text-decoration-color: #008080; font-style: italic">None</span><span style="color: #008080; text-decoration-color: #008080">)</span>
+  <span style="color: #008080; text-decoration-color: #008080">--auto-crop</span>, <span style="color: #008080; text-decoration-color: #008080">--no-auto-crop</span>
+                        <span style="color: #ffffff; text-decoration-color: #ffffff">将原视频裁切（不是拉伸）到16:9</span><span style="color: #008080; text-decoration-color: #008080"> (默认为 </span><span style="color: #008080; text-decoration-color: #008080; font-style: italic">True</span><span style="color: #008080; text-decoration-color: #008080">)</span>
+  <span style="color: #008080; text-decoration-color: #008080">--circle-crop</span>, <span style="color: #008080; text-decoration-color: #008080">--no-circle-crop</span>
+                        <span style="color: #ffffff; text-decoration-color: #ffffff">使用圆形切环</span><span style="color: #008080; text-decoration-color: #008080"> (默认为 </span><span style="color: #008080; text-decoration-color: #008080; font-style: italic">True</span><span style="color: #008080; text-decoration-color: #008080">)</span>
+  <span style="color: #008080; text-decoration-color: #008080">--display-all</span>, <span style="color: #008080; text-decoration-color: #008080">--no-display-all</span>
+                        <span style="color: #ffffff; text-decoration-color: #ffffff">输出正方形版本</span><span style="color: #008080; text-decoration-color: #008080"> (默认为 </span><span style="color: #008080; text-decoration-color: #008080; font-style: italic">True</span><span style="color: #008080; text-decoration-color: #008080">)</span>
+  <span style="color: #008080; text-decoration-color: #008080">--height</span> <span style="color: #00af87; text-decoration-color: #00af87">HEIGHT</span>       <span style="color: #ffffff; text-decoration-color: #ffffff">输出视频高度</span><span style="color: #008080; text-decoration-color: #008080"> (默认为 </span><span style="color: #008080; text-decoration-color: #008080; font-style: italic">0</span><span style="color: #008080; text-decoration-color: #008080">)</span>
+  <span style="color: #008080; text-decoration-color: #008080">--window-size</span> <span style="color: #00af87; text-decoration-color: #00af87">WINDOW_SIZE</span>
+                        <span style="color: #ffffff; text-decoration-color: #ffffff">平滑参数（参数越高越平滑）</span><span style="color: #008080; text-decoration-color: #008080"> (默认为 </span><span style="color: #008080; text-decoration-color: #008080; font-style: italic">3</span><span style="color: #008080; text-decoration-color: #008080">)</span>
+  <span style="color: #008080; text-decoration-color: #008080">-c</span>, <span style="color: #008080; text-decoration-color: #008080">--codec</span> <span style="color: #00af87; text-decoration-color: #00af87">CODEC</span>     <span style="color: #ffffff; text-decoration-color: #ffffff">输出视频所使用的编码器</span><span style="color: #008080; text-decoration-color: #008080"> (默认为 </span><span style="color: #008080; text-decoration-color: #008080; font-style: italic">hevc_nvenc</span><span style="color: #008080; text-decoration-color: #008080">)</span>
+  <span style="color: #008080; text-decoration-color: #008080">-b</span>, <span style="color: #008080; text-decoration-color: #008080">--bitrate</span> <span style="color: #00af87; text-decoration-color: #00af87">BITRATE</span>
+                        <span style="color: #ffffff; text-decoration-color: #ffffff">输出视频码率（不包含音频）</span><span style="color: #008080; text-decoration-color: #008080"> (默认为 </span><span style="color: #008080; text-decoration-color: #008080; font-style: italic">8m</span><span style="color: #008080; text-decoration-color: #008080">)</span>
 </code></pre>
 
 ## 相关项目
