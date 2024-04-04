@@ -41,7 +41,8 @@ jobs:
     # 把 opencv-python-headless 从 requirements.txt 中先去掉再安装
     - name: Pip install
       run: |
-        grep -v 'opencv-python-headless' requirements.txt | xargs pip install
+        grep -v 'opencv-python-headless' requirements.txt > requirements_.txt
+        pip install -r requirements_.txt
       
       # 使用精简版 opencv-python-headless
     - name: Install opencv-python-headless(With only core imgproc and imgcodecs)

@@ -148,9 +148,7 @@ if __name__ == "__main__":
                         nargs='?')
     args = parser.parse_args()
     if args.help:
-        from rich.text import Text
-        console.print(Text.from_ansi(parser.format_help()))
-        Path("out.html").write_text(console.export_html(), encoding="UTF-8")
+        parser.print_help()
         exit()
     if args.input_video is None:
         ui(config_data)
