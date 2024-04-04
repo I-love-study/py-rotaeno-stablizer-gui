@@ -34,15 +34,15 @@ def get_ffprobe():
     return "ffprobe"
 
 
-def audio_copy(audio_from, audio_to):
-    print([
-        get_ffmpeg(), "-y", "-i", audio_from, "-i", audio_to, "-map",
-        "0:a", "-map", "1:v", "-c", "copy", audio_to
-    ])
+def audio_copy(audio_from: str | PathLike, audio_to: str | PathLike):
+    audio_from = Path(audio_from)
+    audio_to = Path(audio_to)
+    audio_temp = audio_to.with_stem(audio_to.stem + "_video")
+    audio_to.rename(audio_temp)
     stderr = None
     try:
         pipe = subprocess.Popen([
-            get_ffmpeg(), "-y", "-i", audio_from, "-i", audio_to,
+            get_ffmpeg(), "-y", "-i", audio_from, "-i", audio_temp,
             "-map", "0:a", "-map", "1:v", "-c", "copy", audio_to
         ],
                                 stderr=subprocess.PIPE)
@@ -51,6 +51,9 @@ def audio_copy(audio_from, audio_to):
         if stderr is None:
             raise e
         raise OSError(stderr) from e
+    
+    # 不用 finally，好不容易出来的视频，炸了就先别删
+    audio_temp.unlink()
 
 
 class FFMpegReader:
