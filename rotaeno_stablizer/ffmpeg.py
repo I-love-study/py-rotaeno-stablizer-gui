@@ -12,6 +12,10 @@ import numpy as np
 log = logging.getLogger()
 
 
+class FFMpegError(Exception):
+    ...
+
+
 def get_ffmpeg():
     """获取本机拥有的编解码器"""
     if which("ffmpeg"):
@@ -51,7 +55,7 @@ def audio_copy(audio_from: str | PathLike, audio_to: str | PathLike):
         if stderr is None:
             raise e
         raise OSError(stderr) from e
-    
+
     # 不用 finally，好不容易出来的视频，炸了就先别删
     audio_temp.unlink()
 
@@ -62,14 +66,13 @@ class FFMpegReader:
                  input_name: str | PathLike,
                  fps: int | None = None) -> None:
         self.input_file = Path(input_name)
-        #self.is_vfr = self.vfr_check()
-        self.is_vfr = True
+        self.is_vfr = self.vfr_check()
         self.info = self.get_info()
         common_fps = [30, 60, 75, 90, 120, 144, 180, 240]
         self.hope_fps = min(common_fps,
                             key=lambda x: abs(x - self.info["fps"])
                             ) if fps is None and self.is_vfr else fps
-        self.queue = queue.Queue
+        self.queue = queue.Queue(5)
 
     def get_info(self):
         commands = [
@@ -114,7 +117,7 @@ class FFMpegReader:
         target_number = match.group(1)
         return float(target_number)
 
-    def read(self, resize: tuple[int, int] | None = None):
+    def start(self, resize: tuple[int, int] | None = None):
         commands = [
             get_ffmpeg(), "-loglevel", "error", "-i", self.input_file
         ]
@@ -136,15 +139,29 @@ class FFMpegReader:
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 bufsize=frame_size + 1)
+        return pipe, height, width
 
+    def __iter__(self):
+        while True:
+            q = self.queue.get()
+            if q is None:
+                return
+            yield q
+            self.queue.task_done()
+            
+
+    def read(self):
+        pipe, height, width = self.start()
+        frame_size = height * width * 4
         stdout = pipe.stdout
         assert stdout is not None
         while pipe.poll() is None:
             frame_raw = stdout.read(frame_size)
             frame = np.frombuffer(frame_raw, dtype=np.uint8)
             if frame.size == 0: break
-            yield frame.reshape((height, width, 4)).copy()
+            self.queue.put(frame.reshape((height, width, 4)).copy())
             stdout.flush()
+        self.queue.put(None)
         pipe.wait()
 
 
@@ -205,23 +222,20 @@ class FFMpegWriter:
         self.start()
         assert self.pipe
         assert self.pipe.stdin
-        while True:
-            frame = self.queue.get()
-            if frame is None:
-                self.pipe.stdin.close()
-                self.pipe.wait()
+        with self.pipe:
+            while True:
+                frame = self.queue.get()
+                if frame is None:
+                    self.queue.task_done()
+                    break
+                assert frame.shape == (self.height, self.width, 4)
+                try:
+                    self.pipe.stdin.write(frame)
+                except BrokenPipeError as e:
+                    assert self.pipe.stderr
+                    line = self.pipe.stderr.read().decode(encoding="UTF-8").splitlines()
+                    raise FFMpegError("\n".join(line)) from e
                 self.queue.task_done()
-                break
-            assert frame.shape == (self.height, self.width, 4)
-            self.pipe.stdin.write(frame)
-            self.queue.task_done()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        assert self.pipe
-        assert self.pipe.stdin
-        self.pipe.stdin.close()
-        self.pipe.wait()
-
 
 if __name__ == "__main__":
     a = FFMpegReader("test.mp4")
