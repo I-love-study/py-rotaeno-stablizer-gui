@@ -1,8 +1,10 @@
 import argparse
 import tomllib
 from pathlib import Path
+import logging
 
 from rich import print as rprint
+from rich.logging import RichHandler
 from rich_argparse import RichHelpFormatter
 
 from rotaeno_stablizer import Rotaeno
@@ -98,8 +100,12 @@ if __name__ == "__main__":
         config_path.read_text(encoding="UTF-8"))
     parser = argparse.ArgumentParser(
         description='Rotaeno',
-        formatter_class=ArgumentDefaultsHelpFormatter, add_help=False)
-    parser.add_argument('-h' , '--help', help = '帮助', action='store_true')
+        formatter_class=ArgumentDefaultsHelpFormatter,
+        add_help=False)
+    parser.add_argument('-h',
+                        '--help',
+                        help='帮助',
+                        action='store_true')
     parser.add_argument("-o",
                         "--output-video",
                         type=str,
@@ -142,6 +148,10 @@ if __name__ == "__main__":
                         type=str,
                         default=config_data["encode"]["bitrate"],
                         help="输出视频码率（不包含音频）")
+    parser.add_argument("--loglevel",
+                        type=str,
+                        default=config_data["other"]["loglevel"],
+                        help="输出视频码率（不包含音频）")
     parser.add_argument("input_video",
                         type=str,
                         default=None,
@@ -153,11 +163,12 @@ if __name__ == "__main__":
     if args.input_video is None:
         ui(config_data)
     else:
+        logging.getLogger("rich").setLevel(args.loglevel.upper())
         rotaeno = Rotaeno(rotation_version=args.rotation_version,
                           circle_crop=args.circle_crop,
                           auto_crop=args.auto_crop,
                           display_all=args.display_all,
-                          background=args.background_path,
+                          background=args.background,
                           height=args.height,
                           spectrogram_circle=False,
                           window_size=args.window_size)

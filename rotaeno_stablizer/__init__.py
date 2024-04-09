@@ -1,7 +1,7 @@
 import logging
 import math
 from os import PathLike
-import queue
+import traceback
 import time
 from collections import deque
 from pathlib import Path
@@ -77,7 +77,7 @@ class Rotaeno:
         self.auto_crop = auto_crop
         self.spectrogram_circle = spectrogram_circle
         self.display_all = display_all
-        self.height = height
+        self.height = height if height != 0 else None
 
         if isinstance(background,
                       str) and background.startswith("http"):
@@ -91,8 +91,6 @@ class Rotaeno:
             self.background = None
 
         self.con = get_console()
-        self.read_frame_queue = queue.Queue(5)  # 最多存放5帧
-        self.event = threading.Event()
 
     def generate_background(self, width: int, height: int, r: float,
                             thickness: float) -> np.ndarray:
@@ -259,8 +257,11 @@ class Rotaeno:
             background[translucent] * (1 - mask3[translucent]))"""
         return rotated_frame  #combine_frame
 
-    def process_video(self, output_writer: ffmpeg.FFMpegWriter,
-                      frame_count: int):
+    def process_video(self,
+                      input_reader: ffmpeg.FFMpegReader,
+                      output_writer: ffmpeg.FFMpegWriter,
+                      frame_count: int,
+                      event: threading.Event = threading.Event()):
         with Progress(
                 TextColumn(
                     "[progress.description]{task.description}"),
@@ -270,14 +271,15 @@ class Rotaeno:
             #先给稳定器投喂点数据
             wakeup_elems = []
             for _ in range(self.rotation_method.wake_up_num):
-                wakeup_elems.append(self.read_frame_queue.get())
-                self.read_frame_queue.task_done()
+                if event.is_set():
+                    return
+                wakeup_elems.append(input_reader.queue.get())
+                input_reader.queue.task_done()
             self.rotation_method.wake_up(wakeup_elems)
             angle_deque = deque(
                 wakeup_elems, maxlen=self.rotation_method.window_size)
             task = progress.add_task("Rendering", total=frame_count)
-            while True:
-                f = self.read_frame_queue.get()
+            for f in input_reader:
                 if f is None:
                     break
                 angle_deque.append(f)
@@ -287,20 +289,14 @@ class Rotaeno:
                     angle)
                 output_writer.queue.put(a)
                 progress.advance(task)
-                self.read_frame_queue.task_done()
             for f in range(self.rotation_method.wake_up_num):
+                if event.is_set():
+                    return
                 output_writer.queue.put(
                     self.process_frame(angle_deque.popleft(),
                                        self.rotation_method.update()))
                 progress.advance(task)
             output_writer.queue.put(None)
-
-    def _read_frame(self, reader: ffmpeg.FFMpegReader):
-        for i in reader.read():
-            if self.event.is_set():
-                raise RuntimeError
-            self.read_frame_queue.put(i)
-        self.read_frame_queue.put(None)
 
     def run(self, input_video: str | PathLike,
             output_video: str | PathLike, codec: str, bitrate: str):
@@ -333,23 +329,38 @@ class Rotaeno:
                 background_image=bg_temp_path)
             status.update("[1/3]Loading Video... Complete")
         frame_count = int(input_reader.info["duration"] * fps_output)
-        read_thread = threading.Thread(target=self._read_frame,
-                                       args=(input_reader, ))
-        write_thread = threading.Thread(target=output_writer.write)
-        try:
-            read_thread.start()
-            write_thread.start()
 
-            # 处理视频帧
-            self.process_video(output_writer, frame_count)
-        except:
-            # 把 Read 给炸了
-            self.event.set()
-            read_thread.join()
-            output_writer.queue.put(None)
-            return
-        finally:
-            write_thread.join()
+
+        list_task = [
+            threading.Thread(target=input_reader.read, daemon=True),
+            threading.Thread(
+                target=self.process_video,
+                args=[input_reader, output_writer, frame_count], daemon=True),
+            threading.Thread(target=output_writer.write, daemon=True)
+        ]
+
+        event = threading.Event()
+
+        def excepthook(args):
+            traceback.print_exception(args.exc_type, args.exc_value, args.exc_traceback)
+            event.set()
+
+        threading.excepthook = excepthook
+
+        for i in list_task:
+            log.debug(f"Start Thread {i}")
+            i.start()
+
+        def join_hook():
+            for i in list_task:
+                i.join()
+            event.set()
+            
+        threading.Thread(target=join_hook, daemon=True).start()
+
+        event.wait()
+        
+
         # 删了临时文件
         bg_temp_path.unlink()
         with self.con.status("[3/3]Coping audio") as status:

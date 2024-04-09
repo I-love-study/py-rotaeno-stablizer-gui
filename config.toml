@@ -15,3 +15,4 @@ bitrate = "8m" # 8 Mbps
 ask_for_config = true # 在直接运行时，是否询问
 default_output_filename = "{}_out" # 默认输出文件名
 ask_for_output = false # 是否需要询问输出文件
+loglevel = "info" # 日志等级
