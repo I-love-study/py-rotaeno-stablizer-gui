@@ -1,6 +1,6 @@
 import json
 import logging
-import queue
+from queue import Queue
 import re
 import subprocess
 from os import PathLike
@@ -9,7 +9,7 @@ from shutil import which
 
 import numpy as np
 
-log = logging.getLogger()
+log = logging.getLogger("rich")
 
 
 class FFMpegError(Exception):
@@ -64,7 +64,7 @@ class FFMpegReader:
 
     def __init__(self,
                  input_name: str | PathLike,
-                 fps: int | None = None) -> None:
+                 fps: float | None = None) -> None:
         self.input_file = Path(input_name)
         self.is_vfr = self.vfr_check()
         self.info = self.get_info()
@@ -72,7 +72,9 @@ class FFMpegReader:
         self.hope_fps = min(common_fps,
                             key=lambda x: abs(x - self.info["fps"])
                             ) if fps is None and self.is_vfr else fps
-        self.queue = queue.Queue(5)
+        log.debug(f"Output Video fps: {self.hope_fps}")
+        self.queue = Queue(5)
+        self.resize: tuple[int, int] | None = None
 
     def get_info(self):
         commands = [
@@ -96,7 +98,11 @@ class FFMpegReader:
                 and video_info["side_data_list"][0]["rotation"] % 360
                 in [90, 270]):
             height, width = width, height
+        
+        log.debug(f"Video Width: {width}, Height: {height}")
         duration = float(video_info["duration"])
+        log.debug(f"Video duration: {duration:.2f}s")
+        log.debug(f"Video fps: {video_fps:.2f}")
         return {
             "fps": video_fps,
             "height": height,
@@ -114,19 +120,20 @@ class FFMpegReader:
         pattern = r'VFR:(\d+\.\d+)'
         match = re.search(pattern, vfr_str)
         assert match is not None
-        target_number = match.group(1)
-        return float(target_number)
+        target_number = float(match.group(1))
+        log.debug(f"VFR have {target_number:.2f}")
+        return target_number
 
-    def start(self, resize: tuple[int, int] | None = None):
+    def start(self):
         commands = [
             get_ffmpeg(), "-loglevel", "error", "-i", self.input_file
         ]
         if self.hope_fps is not None:
             commands += ["-vf", "fps=" + str(self.hope_fps)]
-        if resize is not None:
-            commands += ["-s", f"{resize[0]}x{resize[1]}"]
-            width = resize[0]
-            height = resize[1]
+        if self.resize is not None:
+            commands += ["-s", f"{self.resize[0]}x{self.resize[1]}"]
+            width = self.resize[0]
+            height = self.resize[1]
         else:
             width = self.info["width"]
             height = self.info["height"]
@@ -141,16 +148,15 @@ class FFMpegReader:
                                 bufsize=frame_size + 1)
         return pipe, height, width
 
-    def __iter__(self):
+    def read(self):
         while True:
             q = self.queue.get()
             if q is None:
                 return
             yield q
             self.queue.task_done()
-            
 
-    def read(self):
+    def start_process(self):
         pipe, height, width = self.start()
         frame_size = height * width * 4
         stdout = pipe.stdout
@@ -186,7 +192,7 @@ class FFMpegWriter:
         self.background_image = background_image
         self.bitrate = bitrate
         self.pipe = None
-        self.queue = queue.Queue(5)
+        self.queue = Queue(5)
 
     def start(self):
         commands = [get_ffmpeg(), "-y", "-loglevel", "warning"]
@@ -218,7 +224,7 @@ class FFMpegWriter:
             bufsize=self.height * self.width * 4 + 1)
         return self
 
-    def write(self):
+    def start_process(self):
         self.start()
         assert self.pipe
         assert self.pipe.stdin

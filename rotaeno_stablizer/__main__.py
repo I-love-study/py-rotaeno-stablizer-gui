@@ -4,7 +4,6 @@ from pathlib import Path
 import logging
 
 from rich import print as rprint
-from rich.logging import RichHandler
 from rich_argparse import RichHelpFormatter
 
 from rotaeno_stablizer import Rotaeno
@@ -130,7 +129,8 @@ if __name__ == "__main__":
                         action=argparse.BooleanOptionalAction,
                         default=config_data["video"]["display_all"],
                         help="输出正方形版本")
-    parser.add_argument("--height",
+    parser.add_argument("-h",
+                        "--height",
                         type=int,
                         default=config_data["video"]["height"],
                         help="输出视频高度")

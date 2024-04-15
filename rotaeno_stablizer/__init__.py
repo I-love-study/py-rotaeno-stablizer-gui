@@ -81,9 +81,11 @@ class Rotaeno:
 
         if isinstance(background,
                       str) and background.startswith("http"):
+            log.debug(f"Downloading {background}")
             r = urllib.request.urlopen(background)
-            background_data = np.fromstring(r.read, np.uint8)
+            background_data = np.fromstring(r.read(), np.uint8)
             self.background = cv2.imdecode(background_data, 1)
+            log.debug("Download Success")
         elif background is not None:
             background_data = np.fromfile(background, dtype=np.uint8)
             self.background = cv2.imdecode(background_data, 1)
@@ -96,7 +98,7 @@ class Rotaeno:
                             thickness: float) -> np.ndarray:
 
         brightness = 0.2
-        background_np = np.zeros((height, width, 3), dtype=np.uint8)
+        background_np = np.zeros((height, width, 4), dtype=np.uint8)
         if self.background is not None:
             # 为了支持中文路径的操作
             background = cv2.resize(self.background,
@@ -109,10 +111,10 @@ class Rotaeno:
             background_np = paste_image(background_np, background,
                                         offset_x, offset_y)
         cv2.circle(background_np, (width // 2, height // 2),
-                   int(r), (255, 255, 255),
+                   int(r), (255, 255, 255, 255),
                    int(thickness),
                    lineType=cv2.LINE_AA)
-        return cv2.cvtColor(background_np, cv2.COLOR_BGR2RGB)
+        return background_np
 
     def _get_video_info(self,
                         height,
@@ -135,6 +137,31 @@ class Rotaeno:
         circle_radius = (1.5575 * real_height) // 2
         circle_thickness = max(real_height // 120, 1)
 
+        if self.display_all:
+            video_a = ceil_even(
+                real_width if self.circle_crop else max_size)
+
+            background = self.generate_background(
+                video_a, video_a, circle_radius, circle_thickness)
+        else:
+            video_a = None
+            background = self.generate_background(
+                real_width, real_height, circle_radius,
+                circle_thickness)
+
+        if output_height_want is not None:
+            if self.display_all:
+                resize_ratio = video_a / output_height_want
+                video_a = output_height_want
+                real_height /= resize_ratio
+                real_width /= resize_ratio
+            else:
+                resize_ratio = real_height / output_height_want
+                real_height = output_height_want
+                real_width /= resize_ratio
+            circle_radius /= resize_ratio
+            circle_thickness /= resize_ratio
+        
         real_height = ceil_even(real_height)
         real_width = ceil_even(real_width)
 
@@ -153,32 +180,8 @@ class Rotaeno:
                             255,
                             dtype=np.uint8)
 
-        if self.display_all:
-            video_a = ceil_even(
-                real_width if self.circle_crop else max_size)
-
-            background = self.generate_background(
-                video_a, video_a, circle_radius, circle_thickness)
-            if output_height_want is not None:
-                resize_ratio = video_a / output_height_want
-        else:
-            video_a = None
-            background = self.generate_background(
-                real_width, real_height, circle_radius,
-                circle_thickness)
-            if output_height_want is not None:
-                resize_ratio = real_height / output_height_want
-
-        if output_height_want is not None:
-            if self.display_all:
-                video_a = output_height_want
-            else:
-                real_height = output_height_want
-                real_width /= resize_ratio
-            circle_radius /= resize_ratio
-            circle_thickness /= resize_ratio
-        return PaintMsg(real_height=ceil_even(real_height),
-                        real_width=ceil_even(real_width),
+        return PaintMsg(real_height=real_height,
+                        real_width=real_width,
                         circle_radius=circle_radius,
                         circle_thickness=circle_thickness,
                         background=background,
@@ -257,11 +260,15 @@ class Rotaeno:
             background[translucent] * (1 - mask3[translucent]))"""
         return rotated_frame  #combine_frame
 
+    def process_frame_multi(self, ):
+        ...
+
     def process_video(self,
                       input_reader: ffmpeg.FFMpegReader,
                       output_writer: ffmpeg.FFMpegWriter,
                       frame_count: int,
                       event: threading.Event = threading.Event()):
+
         with Progress(
                 TextColumn(
                     "[progress.description]{task.description}"),
@@ -279,7 +286,7 @@ class Rotaeno:
             angle_deque = deque(
                 wakeup_elems, maxlen=self.rotation_method.window_size)
             task = progress.add_task("Rendering", total=frame_count)
-            for f in input_reader:
+            for f in input_reader.read():
                 if f is None:
                     break
                 angle_deque.append(f)
@@ -299,18 +306,22 @@ class Rotaeno:
             output_writer.queue.put(None)
 
     def run(self, input_video: str | PathLike,
-            output_video: str | PathLike, codec: str, bitrate: str):
+            output_video: str | PathLike, codec: str, bitrate: str, fps: float | None = None):
         with self.con.status("[1/3]Loading Video...") as status:
-            input_reader = ffmpeg.FFMpegReader(input_video)
+            input_reader = ffmpeg.FFMpegReader(input_video, fps)
             self.paint_msg = self._get_video_info(
                 input_reader.info["height"],
                 input_reader.info["width"], self.height)
+            if self.height is not None and input_reader.info["height"] != self.paint_msg.real_height:
+                log.debug(f"Resize Input Video to {self.paint_msg.real_width}x{self.paint_msg.real_height}")
             background_BGR = cv2.cvtColor(self.paint_msg.background,
                                           cv2.COLOR_RGB2BGR)
             # 又是一个支持中文路径小技巧
             bg_temp_path = Path("temp.png")
-            cv2.imencode('.png',
-                         background_BGR)[1].tofile(bg_temp_path)
+            cv2.imencode('.png', background_BGR,
+                         [cv2.IMWRITE_PNG_COMPRESSION, 9
+                          ])[1].tofile(bg_temp_path)
+            log.debug(f"Save background image in {bg_temp_path.absolute()}")
             fps_output = (input_reader.info["fps"]
                           if input_reader.hope_fps is None else
                           input_reader.hope_fps)
@@ -319,6 +330,8 @@ class Rotaeno:
                 width, height = self.paint_msg.video_a, self.paint_msg.video_a
             else:
                 width, height = self.paint_msg.real_width, self.paint_msg.real_height
+
+            log.debug(f"Output Video Width: {width}, Height: {height}")
             output_writer = ffmpeg.FFMpegWriter(
                 output_video,
                 width=width,
@@ -328,21 +341,28 @@ class Rotaeno:
                 bitrate=bitrate,
                 background_image=bg_temp_path)
             status.update("[1/3]Loading Video... Complete")
+
+
         frame_count = int(input_reader.info["duration"] * fps_output)
 
+        if self.height is not None and self.paint_msg.real_height != self.height:
+            log.debug(f"Resize input video as {self.paint_msg.real_width}x{self.paint_msg.real_height}")
+            input_reader.resize = (self.paint_msg.real_width, self.paint_msg.real_height)
 
         list_task = [
-            threading.Thread(target=input_reader.read, daemon=True),
+            threading.Thread(target=input_reader.start_process, daemon=True),
             threading.Thread(
                 target=self.process_video,
-                args=[input_reader, output_writer, frame_count], daemon=True),
-            threading.Thread(target=output_writer.write, daemon=True)
+                args=[input_reader, output_writer, frame_count],
+                daemon=True),
+            threading.Thread(target=output_writer.start_process, daemon=True)
         ]
 
         event = threading.Event()
 
         def excepthook(args):
-            traceback.print_exception(args.exc_type, args.exc_value, args.exc_traceback)
+            traceback.print_exception(args.exc_type, args.exc_value,
+                                      args.exc_traceback)
             event.set()
 
         threading.excepthook = excepthook
@@ -355,14 +375,14 @@ class Rotaeno:
             for i in list_task:
                 i.join()
             event.set()
-            
+
         threading.Thread(target=join_hook, daemon=True).start()
 
         event.wait()
-        
 
         # 删了临时文件
         bg_temp_path.unlink()
+        log.debug(f"Del {bg_temp_path.absolute()}")
         with self.con.status("[3/3]Coping audio") as status:
             ffmpeg.audio_copy(input_video, output_video)
 
