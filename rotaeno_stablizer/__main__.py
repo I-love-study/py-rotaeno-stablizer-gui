@@ -129,8 +129,7 @@ if __name__ == "__main__":
                         action=argparse.BooleanOptionalAction,
                         default=config_data["video"]["display_all"],
                         help="输出正方形版本")
-    parser.add_argument("-h",
-                        "--height",
+    parser.add_argument("--height",
                         type=int,
                         default=config_data["video"]["height"],
                         help="输出视频高度")
