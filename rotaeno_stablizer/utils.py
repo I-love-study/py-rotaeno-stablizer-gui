@@ -49,12 +49,17 @@ def paste_image(background_image: np.ndarray,
         offset_y_fore_start = -offset_y
         offset_y_fore_end = offset_y
 
+    if foreground_image.shape[2] != 4:
+        dep = slice(0, 2)
+    else:
+        dep = slice(None, None)
+
     # 粘贴前景图像到背景图像上
     background_image[
         offset_y_start:offset_y_end,
-        offset_x_start:offset_x_end, :] = foreground_image[
+        offset_x_start:offset_x_end, dep] = foreground_image[
             offset_y_fore_start:offset_y_fore_end,
-            offset_x_fore_start:offset_x_fore_end, :]
+            offset_x_fore_start:offset_x_fore_end, dep]
     return background_image
 
 
