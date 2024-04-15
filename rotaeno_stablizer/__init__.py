@@ -11,7 +11,7 @@ import urllib.request
 
 import cv2
 import numpy as np
-from rich import get_console
+from rich import get_console, print as rprint
 from rich.logging import RichHandler
 from rich.progress import (
     BarColumn,
@@ -285,7 +285,7 @@ class Rotaeno:
             self.rotation_method.wake_up(wakeup_elems)
             angle_deque = deque(
                 wakeup_elems, maxlen=self.rotation_method.window_size)
-            task = progress.add_task("Rendering", total=frame_count)
+            task = progress.add_task("[2/3]Rendering Video", total=frame_count)
             for f in input_reader.read():
                 if f is None:
                     break
@@ -304,6 +304,7 @@ class Rotaeno:
                                        self.rotation_method.update()))
                 progress.advance(task)
             output_writer.queue.put(None)
+            #progress.remove_task(task)
 
     def run(self, input_video: str | PathLike,
             output_video: str | PathLike, codec: str, bitrate: str, fps: float | None = None):
@@ -340,7 +341,8 @@ class Rotaeno:
                 codec=codec,
                 bitrate=bitrate,
                 background_image=bg_temp_path)
-            status.update("[1/3]Loading Video... Complete")
+        rprint(":white_check_mark:[1/3]Loading Video... Complete")
+        
 
 
         frame_count = int(input_reader.info["duration"] * fps_output)
@@ -359,10 +361,11 @@ class Rotaeno:
         ]
 
         event = threading.Event()
-
+        is_exception = threading.Event()
         def excepthook(args):
             traceback.print_exception(args.exc_type, args.exc_value,
                                       args.exc_traceback)
+            is_exception.set()
             event.set()
 
         threading.excepthook = excepthook
@@ -379,6 +382,10 @@ class Rotaeno:
         threading.Thread(target=join_hook, daemon=True).start()
 
         event.wait()
+        if is_exception.is_set():
+            exit()
+
+        rprint(":white_check_mark:[2/3]Rendering Video... Complete")
 
         # 删了临时文件
         bg_temp_path.unlink()
@@ -389,7 +396,7 @@ class Rotaeno:
 
 if __name__ == "__main__":
     a = Rotaeno(
-        background_path="Songs_today-is-not-tomorrow.png",
+        background="Songs_today-is-not-tomorrow.png",
         circle_crop=True,
         #auto_crop=False,
         display_all=True,
