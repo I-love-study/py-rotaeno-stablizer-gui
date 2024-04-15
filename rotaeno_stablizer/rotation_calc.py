@@ -71,8 +71,8 @@ class RotationCalc:
         """获取足够多的参数"""
         if len(frames) != self.wake_up_num:
             raise ValueError("Wrong angle count")
-        self.deque.append(
-            self.method(*self.get_points(frames[0][:, :, :3])))
+        angle = self.method(*self.get_points(frames[0][:, :, :3]))
+        self.deque.append((angle - 360) if angle > 180 else angle)
         for frame in frames[1:]:
             angle = self.method(*self.get_points(frame[:, :, :3]))
             if abs(angle - self.deque[-1]) > 180:
