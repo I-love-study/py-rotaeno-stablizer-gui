@@ -26,14 +26,16 @@ from . import ffmpeg
 from .rotation_calc import RotationCalc
 from .utils import FPSColumn, paste_image
 
-PaintMsg = NamedTuple("PaintMsg",
-                      real_height=int,
-                      real_width=int,
-                      circle_radius=float,
-                      circle_thickness=float,
-                      background=np.ndarray,
-                      video_a=int | None,
-                      image_alpha=np.ndarray)
+
+class PaintMsg(NamedTuple):
+    video_resize: tuple[int, int]
+    video_crop: tuple[int, int]
+    output_size: tuple[int, int]
+    circle_radius: float
+    circle_thickness: float
+    background: np.ndarray
+    image_alpha: np.ndarray
+
 
 FORMAT = "%(message)s"
 logging.basicConfig(level="INFO",
@@ -44,8 +46,8 @@ logging.basicConfig(level="INFO",
 log = logging.getLogger("rich")
 
 
-def ceil_even(num: float) -> int:
-    return math.ceil(num / 2) * 2
+def ceil_even(num: tuple[float, float]) -> tuple[int, int]:
+    return tuple(math.ceil(n / 2) * 2 for n in num)
 
 
 class Rotaeno:
@@ -117,75 +119,79 @@ class Rotaeno:
         return background_np
 
     def _get_video_info(self,
-                        height,
-                        width,
+                        height: int,
+                        width: int,
                         output_height_want: int | None = None):
+
         aspect_ratio = 16 / 9
 
-        real_width = width
-        real_height = height
+        # ciricle radius is from https://github.com/Lawrenceeeeeeee/python_rotaeno_stabilizer
+
         if self.auto_crop:
             video_ratio = width / height
-            if video_ratio < aspect_ratio:
-                real_height = width / aspect_ratio
-            elif video_ratio > aspect_ratio:
-                real_width = height * aspect_ratio
-
-        max_size = ceil_even(math.sqrt(real_width**2 +
-                                       real_height**2))
-        # ciricle radius is from https://github.com/Lawrenceeeeeeee/python_rotaeno_stabilizer
-        circle_radius = (1.5575 * real_height) // 2
-        circle_thickness = max(real_height // 120, 1)
+            if math.isclose(video_ratio, aspect_ratio, rel_tol=1e-03):
+                video_crop = (width, height)
+            elif video_ratio < aspect_ratio:
+                video_crop = (width, width / aspect_ratio)
+            else:  #if video_ratio > aspect_ratio
+                video_crop = (height * aspect_ratio, height)
+        else:
+            video_crop = (width, height)
 
         if self.display_all:
-            video_a = ceil_even(
-                real_width if self.circle_crop else max_size)
-
-            background = self.generate_background(
-                video_a, video_a, circle_radius, circle_thickness)
-        else:
-            video_a = None
-            background = self.generate_background(
-                real_width, real_height, circle_radius,
-                circle_thickness)
+            video_a = (math.sqrt(video_crop[0]**2 + video_crop[1]**2)
+                       if not self.circle_crop else video_crop[0])
 
         if output_height_want is not None:
             if self.display_all:
                 resize_ratio = video_a / output_height_want
                 video_a = output_height_want
-                real_height /= resize_ratio
-                real_width /= resize_ratio
+                video_resize = (video_crop[0] / resize_ratio,
+                                video_crop[1] / resize_ratio)
             else:
-                resize_ratio = real_height / output_height_want
-                real_height = output_height_want
-                real_width /= resize_ratio
-            circle_radius /= resize_ratio
-            circle_thickness /= resize_ratio
-        
-        real_height = ceil_even(real_height)
-        real_width = ceil_even(real_width)
+                resize_ratio = video_crop[1] / output_height_want
+                video_resize = (video_crop[0] / resize_ratio,
+                                output_height_want)
+        else:
+            video_resize = (width, height)
+
+        circle_radius = (1.5575 * video_crop[1]) // 2
+        circle_thickness = max(video_crop[1] // 120, 1)
+
+        if self.display_all:
+            output_size = (video_a, video_a)
+        elif self.circle_crop:
+            output_size = video_crop
+        else:
+            output_size = (math.sqrt(video_crop[0]**2 +
+                                     video_crop[1]**2), video_crop[1])
+
+        video_resize = ceil_even(video_resize)
+        video_crop = ceil_even(video_crop)
+        output_size = ceil_even(output_size)
 
         if self.circle_crop:
-
-            alpha = np.zeros((real_height, real_width),
-                             dtype=np.uint8)
-            alpha = cv2.circle(alpha,
-                               (real_width // 2, real_height // 2),
-                               real_width // 2, (255, ),
-                               thickness=-1,
-                               lineType=cv2.LINE_AA)
+            alpha = np.zeros(video_crop[::-1], dtype=np.uint8)
+            alpha = cv2.circle(
+                alpha, (video_crop[0] // 2, video_crop[1] // 2),
+                video_crop[0] // 2, (255, ),
+                thickness=-1,
+                lineType=cv2.LINE_AA)
             #print("2", time.time() - t)
         else:
-            alpha = np.full((real_height, real_width),
-                            255,
-                            dtype=np.uint8)
 
-        return PaintMsg(real_height=real_height,
-                        real_width=real_width,
+            alpha = np.full(video_crop[::-1], 255, dtype=np.uint8)
+
+        background = self.generate_background(*output_size,
+                                              circle_radius,
+                                              circle_thickness)
+
+        return PaintMsg(video_resize=video_resize,
+                        video_crop=video_crop,
+                        output_size=output_size,
                         circle_radius=circle_radius,
                         circle_thickness=circle_thickness,
                         background=background,
-                        video_a=video_a,
                         image_alpha=alpha)
 
     def process_frame(self, frame: np.ndarray, angle: float):
@@ -196,78 +202,39 @@ class Rotaeno:
             height (int): 输出帧高度
             width (int): 输出帧宽度
         """
-        # 自动裁切
-        t = time.time()
         height, width = frame.shape[:2]
-        if self.auto_crop:
-            if self.paint_msg.real_height != height:
-                offset = (height - self.paint_msg.real_height) // 2
-                frame = frame[offset:-offset, :, :]
-                height = self.paint_msg.real_height
-            elif self.paint_msg.real_width != width:
-                offset = (width - self.paint_msg.real_width) // 2
-                frame = frame[:, offset:-offset, :]
-                width = self.paint_msg.real_width
-        #print("1", time.time() - t)
-        # 绘制圆形 alpha 通道
 
-        #frame = np.concatenate(
-        #    (frame, np.expand_dims(alpha, axis=-1)), axis=2)
-        #frame = np.dstack(
-        #    (frame, self.paint_msg.image_alpha[..., np.newaxis]))
-        frame[:, :, 3] = self.paint_msg.image_alpha
-        #print("3", time.time() - t)
+        if self.paint_msg.video_resize != self.paint_msg.video_crop:
+            if self.paint_msg.video_crop[1] != height:
+                offset = (height - self.paint_msg.video_crop[1]) // 2
+                frame = frame[offset:-offset, :, :]
+                height = self.paint_msg.video_crop[1]
+            elif self.paint_msg.video_crop[0] != width:
+                offset = (width - self.paint_msg.video_crop[0]) // 2
+                frame = frame[:, offset:-offset, :]
+                width = self.paint_msg.video_crop[0]
+        # 绘制圆形 alpha 通道
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2RGBA)
+        if self.circle_crop:
+            frame[:,:,3] = self.paint_msg.image_alpha
+
+        # 获取变换矩阵
+        M = cv2.getRotationMatrix2D(
+            (frame.shape[1] // 2, frame.shape[0] // 2), angle, 1)
         # 如果全部显示
         if self.display_all:
-            frame_ = np.zeros(
-                (self.paint_msg.video_a, self.paint_msg.video_a, 4),
-                dtype=np.uint8)
-            offset_x = (self.paint_msg.video_a - width) // 2
-            offset_y = (self.paint_msg.video_a - height) // 2
-            offset_x = slice(offset_x,
-                             -offset_x) if offset_x else slice(
-                                 None, None)
-            offset_y = slice(offset_y,
-                             -offset_y) if offset_y else slice(
-                                 None, None)
-            frame_[offset_y, offset_x, :] = frame
-        else:
-            frame_ = frame
-
-    # print("4", time.time() - t)
-    # 对扩展帧进行旋转
-        M = cv2.getRotationMatrix2D(
-            (frame_.shape[1] // 2, frame_.shape[0] // 2), angle, 1)
+            M[0, 2] += (self.paint_msg.output_size[0] - width) // 2
+            M[1, 2] += (self.paint_msg.output_size[1] - height) // 2
         rotated_frame = cv2.warpAffine(
-            frame_,
+            frame,
             M,
-            (frame_.shape[1], frame_.shape[0]),
+            self.paint_msg.output_size,
         )
-        #print("5", time.time() - t)
-        #background = paint_msg.background.copy()[:, :, :3]
-        #rotated_frame, mask = rotated_frame[:, :, :
-        #                                    3], rotated_frame[:, :, 3]
-        """
-        mask3 = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR) / 255
-        #print(time.time() - t)
-        _, mask = cv2.threshold(mask, 1, 255, cv2.THRESH_BINARY)
-        combine_frame = background.copy()
-        combine_frame[mask == 255] = rotated_frame[mask == 255]
-        #print("3",time.time()-t)
-        translucent = (mask != 255) & (mask != 0)
-        combine_frame[translucent] = (
-            rotated_frame[translucent] * mask3[translucent] +
-            background[translucent] * (1 - mask3[translucent]))"""
-        return rotated_frame  #combine_frame
+        return rotated_frame
 
-    def process_frame_multi(self, ):
-        ...
-
-    def process_video(self,
-                      input_reader: ffmpeg.FFMpegReader,
+    def process_video(self, input_reader: ffmpeg.FFMpegReader,
                       output_writer: ffmpeg.FFMpegWriter,
-                      frame_count: int,
-                      event: threading.Event = threading.Event()):
+                      frame_count: int):
 
         with Progress(
                 TextColumn(
@@ -278,14 +245,15 @@ class Rotaeno:
             #先给稳定器投喂点数据
             wakeup_elems = []
             for _ in range(self.rotation_method.wake_up_num):
-                if event.is_set():
-                    return
                 wakeup_elems.append(input_reader.queue.get())
                 input_reader.queue.task_done()
             self.rotation_method.wake_up(wakeup_elems)
             angle_deque = deque(
                 wakeup_elems, maxlen=self.rotation_method.window_size)
-            task = progress.add_task("[2/3]Rendering Video", total=frame_count)
+            task = progress.add_task(
+                ":hourglass_flowing_sand:[2/3]Rendering Video",
+                total=frame_count)
+
             for f in input_reader.read():
                 if f is None:
                     break
@@ -297,8 +265,6 @@ class Rotaeno:
                 output_writer.queue.put(a)
                 progress.advance(task)
             for f in range(self.rotation_method.wake_up_num):
-                if event.is_set():
-                    return
                 output_writer.queue.put(
                     self.process_frame(angle_deque.popleft(),
                                        self.rotation_method.update()))
@@ -306,33 +272,33 @@ class Rotaeno:
             output_writer.queue.put(None)
             #progress.remove_task(task)
 
-    def run(self, input_video: str | PathLike,
-            output_video: str | PathLike, codec: str, bitrate: str, fps: float | None = None):
+    def run(self,
+            input_video: str | PathLike,
+            output_video: str | PathLike,
+            codec: str,
+            bitrate: str,
+            fps: float | None = None):
         with self.con.status("[1/3]Loading Video...") as status:
             input_reader = ffmpeg.FFMpegReader(input_video, fps)
             self.paint_msg = self._get_video_info(
                 input_reader.info["height"],
                 input_reader.info["width"], self.height)
-            if self.height is not None and input_reader.info["height"] != self.paint_msg.real_height:
-                log.debug(f"Resize Input Video to {self.paint_msg.real_width}x{self.paint_msg.real_height}")
-            background_BGR = cv2.cvtColor(self.paint_msg.background,
-                                          cv2.COLOR_RGB2BGR)
+
             # 又是一个支持中文路径小技巧
             bg_temp_path = Path("temp.png")
-            cv2.imencode('.png', background_BGR,
+            cv2.imencode('.png', self.paint_msg.background,
                          [cv2.IMWRITE_PNG_COMPRESSION, 9
                           ])[1].tofile(bg_temp_path)
-            log.debug(f"Save background image in {bg_temp_path.absolute()}")
+            log.debug(
+                f"Save background image in {bg_temp_path.absolute()}")
             fps_output = (input_reader.info["fps"]
                           if input_reader.hope_fps is None else
                           input_reader.hope_fps)
 
-            if self.display_all:
-                width, height = self.paint_msg.video_a, self.paint_msg.video_a
-            else:
-                width, height = self.paint_msg.real_width, self.paint_msg.real_height
+            width, height = self.paint_msg.output_size
 
-            log.debug(f"Output Video Width: {width}, Height: {height}")
+            log.debug(
+                f"Output Video Width: {width}, Height: {height}")
             output_writer = ffmpeg.FFMpegWriter(
                 output_video,
                 width=width,
@@ -342,26 +308,31 @@ class Rotaeno:
                 bitrate=bitrate,
                 background_image=bg_temp_path)
         rprint(":white_check_mark:[1/3]Loading Video... Complete")
-        
-
 
         frame_count = int(input_reader.info["duration"] * fps_output)
 
-        if self.height is not None and self.paint_msg.real_height != self.height:
-            log.debug(f"Resize input video as {self.paint_msg.real_width}x{self.paint_msg.real_height}")
-            input_reader.resize = (self.paint_msg.real_width, self.paint_msg.real_height)
+        if (self.height is not None and input_reader.info["height"]
+                != self.paint_msg.video_resize[1]):
+            log.debug(
+                "Resize Input Video to "
+                f"{self.paint_msg.video_resize[0]}x{self.paint_msg.video_resize[1]}"
+            )
+            input_reader.resize = self.paint_msg.video_resize
 
         list_task = [
-            threading.Thread(target=input_reader.start_process, daemon=True),
+            threading.Thread(target=input_reader.start_process,
+                             daemon=True),
             threading.Thread(
                 target=self.process_video,
                 args=[input_reader, output_writer, frame_count],
                 daemon=True),
-            threading.Thread(target=output_writer.start_process, daemon=True)
+            threading.Thread(target=output_writer.start_process,
+                             daemon=True)
         ]
 
         event = threading.Event()
         is_exception = threading.Event()
+
         def excepthook(args):
             traceback.print_exception(args.exc_type, args.exc_value,
                                       args.exc_traceback)
@@ -402,4 +373,4 @@ if __name__ == "__main__":
         display_all=True,
         window_size=5)
 
-    a.run("test.mp4", "test_a.mp4")
+    a.run("test.mp4", "test_a.mp4", "hevc_nvnec", "8m")

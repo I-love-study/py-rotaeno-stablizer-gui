@@ -2,6 +2,7 @@ import json
 import logging
 from queue import Queue
 import re
+from rich.markup import escape
 import subprocess
 from os import PathLike
 from pathlib import Path
@@ -91,6 +92,7 @@ class FFMpegReader:
         except StopIteration:
             raise ValueError(
                 "Cannot found video infomation in Stream.")
+        
         video_fps = float(video_info["nb_frames"]) / float(
             video_info["duration"])
         height, width = video_info["height"], video_info["width"]
@@ -128,6 +130,17 @@ class FFMpegReader:
         commands = [
             get_ffmpeg(), "-loglevel", "error", "-i", self.input_file
         ]
+        ("-filter_complex "
+         "[0:v]fps=60[original];"
+         "[original]scale=-1:720, crop=1280:720[cropd]"
+         "[original]crop=10:10:0:0[top_left];"
+         "[original]crop=10:10:iw-10:0[top_right];"
+         "[original]crop=10:10:0:ih-10[bottom_left];"
+         "[original]crop=10:10:iw-10:ih-10[bottom_right];"
+         "[top_left][top_right]hstack[top];"
+         "[bottom_left][bottom_right]hstack[bottom];"
+         "[top][bottom]vstack[rotation];"
+         "")
         if self.hope_fps is not None:
             commands += ["-vf", "fps=" + str(self.hope_fps)]
         if self.resize is not None:
@@ -137,11 +150,11 @@ class FFMpegReader:
         else:
             width = self.info["width"]
             height = self.info["height"]
-        commands += ["-f", "rawvideo", "-pix_fmt", "rgba", "pipe:"]
+        commands += ["-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:"]
         log.debug("Reader Commands: [bold green]" +
-                  " ".join(map(str, commands)),
+                  escape(" ".join(map(str, commands))),
                   extra={"markup": True})
-        frame_size = width * height * 4
+        frame_size = width * height * 3
         pipe = subprocess.Popen(commands,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
@@ -158,14 +171,18 @@ class FFMpegReader:
 
     def start_process(self):
         pipe, height, width = self.start()
-        frame_size = height * width * 4
+        frame_size = height * width * 3
         stdout = pipe.stdout
         assert stdout is not None
         while pipe.poll() is None:
             frame_raw = stdout.read(frame_size)
             frame = np.frombuffer(frame_raw, dtype=np.uint8)
             if frame.size == 0: break
-            self.queue.put(frame.reshape((height, width, 4)).copy())
+            #frame_rgba = np.empty((height, width, 4), np.uint8)
+            #frame_rgba[:,:,:3] = frame.reshape((height, width, 3))
+            #tag = frame.reshape(frame_rgba)
+            #self.queue.put(frame_rgba)
+            self.queue.put(frame.reshape((height, width, 3)))
             stdout.flush()
         self.queue.put(None)
         pipe.wait()
@@ -206,7 +223,7 @@ class FFMpegWriter:
         if self.background_image is not None:
             commands += [
                 "-filter_complex",
-                "[0:v][1:v]overlay=0:H-h:format=rgb[v]", "-map", "[v]"
+                f"[0:v][1:v]overlay=format=yuv420[v]", "-map", "[v]"
             ]
         commands += [
             "-r",
@@ -214,7 +231,7 @@ class FFMpegWriter:
             self.pix_fmt, "-b:v", self.bitrate, self.output_video
         ]
         log.debug("Writer Commands: [bold green]" +
-                  " ".join(map(str, commands)),
+                  escape(" ".join(map(str, commands))),
                   extra={"markup": True})
         self.pipe = subprocess.Popen(
             commands,
@@ -237,11 +254,9 @@ class FFMpegWriter:
                 assert frame.shape == (self.height, self.width, 4)
                 try:
                     self.pipe.stdin.write(frame)
-                except BrokenPipeError as e:
+                except (OSError, BrokenPipeError) as e:
                     assert self.pipe.stderr
                     line = self.pipe.stderr.read().decode(encoding="UTF-8").splitlines()
                     raise FFMpegError("\n".join(line)) from e
                 self.queue.task_done()
 
-if __name__ == "__main__":
-    a = FFMpegReader("test.mp4")

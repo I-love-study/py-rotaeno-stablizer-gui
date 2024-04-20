@@ -50,31 +50,33 @@ class RotationCalc:
                             bottom_left: np.ndarray,
                             bottom_right: np.ndarray) -> float:
         """V2 旋转计算方法"""
-
         # 将二进制颜色值转换为角度
         color_to_degree_matrix = np.array([[2048, 1024, 512],
                                            [256, 128, 64],
-                                           [32, 16, 8], [4, 2, 1]])
+                                           [32, 16, 8], 
+                                           [4, 2, 1]])
         color_matrix = np.vstack(
-            (np.where(top_left >= 127.5, 1,
-                      0), np.where(top_right >= 127.5, 1, 0),
-             np.where(bottom_left >= 127.5, 1,
-                      0), np.where(bottom_right >= 127.5, 1, 0)))
+            (np.where(top_left >= 127.5, 1, 0), 
+             np.where(top_right >= 127.5, 1, 0),
+             np.where(bottom_left >= 127.5, 1, 0), 
+             np.where(bottom_right >= 127.5, 1, 0)
+            ))
 
         color_to_degree = np.sum(color_to_degree_matrix *
                                  color_matrix)
-        rotation_degree = float(color_to_degree / 4096 * -360)
+        rotation_degree = color_to_degree / 4096 * -360
 
+        assert isinstance(rotation_degree, float)
         return -rotation_degree
 
     def wake_up(self, frames: list[np.ndarray]):
         """获取足够多的参数"""
         if len(frames) != self.wake_up_num:
             raise ValueError("Wrong angle count")
-        angle = self.method(*self.get_points(frames[0][:, :, :3]))
+        angle = self.method(*self.get_points(frames[0][:,:,:3]))
         self.deque.append((angle - 360) if angle > 180 else angle)
         for frame in frames[1:]:
-            angle = self.method(*self.get_points(frame[:, :, :3]))
+            angle = self.method(*self.get_points(frame[:,:,:3]))
             if abs(angle - self.deque[-1]) > 180:
                 self.deque.append(angle - 360)
             else:
@@ -85,7 +87,7 @@ class RotationCalc:
         if frame is None:
             self.deque.popleft()
         else:
-            angle = self.method(*self.get_points(frame[:, :, :3]))
+            angle = self.method(*self.get_points(frame[:,:,:3]))
             if abs(angle - self.deque[-1]) > 180:
                 self.deque.append(angle - 360)
             else:
