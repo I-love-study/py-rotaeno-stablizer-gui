@@ -50,7 +50,7 @@ def paste_image(background_image: np.ndarray,
         offset_y_fore_end = offset_y
 
     if foreground_image.shape[2] != 4:
-        dep = slice(0, 2)
+        dep = slice(0, 3)
     else:
         dep = slice(None, None)
 
