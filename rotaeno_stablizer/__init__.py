@@ -361,8 +361,9 @@ class Rotaeno:
         # 删了临时文件
         bg_temp_path.unlink()
         log.debug(f"Del {bg_temp_path.absolute()}")
-        with self.con.status("[3/3]Coping audio") as status:
+        with self.con.status("[3/3]Coping audio...") as status:
             ffmpeg.audio_copy(input_video, output_video)
+        rprint(":white_check_mark:[3/3]Coping audio... Complete")
 
 
 if __name__ == "__main__":
