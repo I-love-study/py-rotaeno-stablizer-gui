@@ -8,7 +8,8 @@ Still in WIP
 
 1. 使用 ffmpeg 作为视频编解码器，可以选择多个编码器选择（包括显卡编码）
 2. 使用 PIPE 作连接，尽量减少中间文件的存储
-3. 采用平滑曲线，让输出更加稳定
+3. 能尽量使用多核性能
+4. 采用平滑曲线，让输出更加稳定
 
 ## 效果展示
 
@@ -35,11 +36,11 @@ Still in WIP
 - [x] SMA 平滑曲线
 - [x] 视频处理
 - [ ] 编码器详细设置
-- [ ] 配置文件
-- [ ] 多线程处理
+- [x] 配置文件
+- [x] ~~多线程处理~~ `cv2.warpAffine` 已是多线程
 - [ ] 环状频谱图（低优先级）
 - [x] 命令行调用
-- [ ] GUI 界面
+- [ ] GUI（或 TUI）界面
 
 ## 安装
 
@@ -70,11 +71,20 @@ pip install -r requirements.txt
 ### 命令行办法(推荐)
 
 ```bash
-./rotaeno_stablizer [options] input_video.mp4 ouput_video.mp4
-python -m rotaeno_stablizer [options] input_video.mp4 ouput_video.mp4
+# 下载的可执行文件
+./rotaeno_stablizer [options] input_video.mp4
+# 下载的 Python 文件
+python -m rotaeno_stablizer [options] input_video.mp4
 ```
 
-或者直接双击，将会得到以下文字
+如
+
+```bash
+./rotaeno_stablizer input_video.mp4 -o ouput_video.mp4
+./rotaeno_stablizer -bg Songs_cover.png input_video.mp4
+```
+
+或者直接双击或 `python -m rotaeno_stablizer`，将会得到以下文字
 
 <pre style="font-family:Menlo,'DejaVu Sans Mono',consolas,sans-serif, monospace; background-color:#171b22">
 <code style="font-family:inherit; background-color:#171b22">请输入原始文件:
@@ -90,13 +100,11 @@ python -m rotaeno_stablizer [options] input_video.mp4 ouput_video.mp4
 请选择输出视频编码器 <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">(hevc_nvenc)</span>:
 请选择输出视频比特率 <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">(8m)</span>: </code></pre>
 
-### 半 GUI 办法
-
-直接双击即可
-
 ### GUI 办法
 
 WIP
+
+~~做一个好看的 GUI 界面可真的要人老命~~
 
 ## Help Usage
 
