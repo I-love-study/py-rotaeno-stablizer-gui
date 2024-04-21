@@ -7,7 +7,7 @@ import urllib.request
 from collections import deque
 from os import PathLike
 from pathlib import Path
-from typing import NamedTuple
+from dataclasses import dataclass
 
 import cv2
 import numpy as np
@@ -27,8 +27,8 @@ from . import ffmpeg
 from .rotation_calc import RotationCalc
 from .utils import FPSColumn, paste_image
 
-
-class PaintMsg(NamedTuple):
+@dataclass
+class PaintMsg:
     video_resize: tuple[int, int]
     video_crop: tuple[int, int]
     output_size: tuple[int, int]
@@ -37,6 +37,13 @@ class PaintMsg(NamedTuple):
     background: np.ndarray
     image_alpha: np.ndarray
 
+    def __repr__(self):
+        fields = (
+            f'{name}={value if not isinstance(value, np.ndarray) else f"array(shape={value.shape})"}'
+            for field in self.__dataclass_fields__.values() if field.repr
+            for name, value in ((field.name, self.__getattribute__(field.name)),)
+            )
+        return f'{self.__class__.__name__}({", ".join(fields)})'
 
 FORMAT = "%(message)s"
 logging.basicConfig(level="INFO",
@@ -48,7 +55,8 @@ log = logging.getLogger("rich")
 
 
 def ceil_even(num: tuple[float, float]) -> tuple[int, int]:
-    return tuple(math.ceil(n / 2) * 2 for n in num)
+    ceil_single = lambda n: math.ceil(n / 2) * 2
+    return (ceil_single(num[0]), ceil_single(num[1]))
 
 
 class Rotaeno:
@@ -85,10 +93,11 @@ class Rotaeno:
         if isinstance(background,
                       str) and background.startswith("http"):
             log.debug(f"Downloading {background}")
-            r = urllib.request.urlopen(background)
-            background_data = np.fromstring(r.read(), np.uint8)
+            with urllib.request.urlopen(background) as f:
+                r = f.read()
+            background_data = np.frombuffer(r, np.uint8)
             self.background = cv2.imdecode(background_data, 1)
-            log.debug("Download Success")
+            log.debug(f"Download Success, Size={self.background.shape}")
         elif background is not None:
             background_data = np.fromfile(background, dtype=np.uint8)
             self.background = cv2.imdecode(background_data, 1)
@@ -106,7 +115,7 @@ class Rotaeno:
             # 为了支持中文路径的操作
             background = cv2.resize(self.background,
                                     (int(r * 2), int(r * 2)))
-            background = (background * brightness).astype(np.uint8)
+            background = np.multiply(background, brightness).astype(np.uint8)
 
             offset_x = int((width - r * 2) / 2)
             offset_y = int((height - r * 2) / 2)
@@ -215,6 +224,7 @@ class Rotaeno:
                 frame = frame[:, offset:-offset, :]
                 width = self.paint_msg.video_crop[0]
         # 绘制圆形 alpha 通道
+        
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2RGBA)
         if self.circle_crop:
             frame[:,:,3] = self.paint_msg.image_alpha
@@ -284,6 +294,7 @@ class Rotaeno:
             self.paint_msg = self._get_video_info(
                 input_reader.info["height"],
                 input_reader.info["width"], self.height)
+            log.debug(f"Paint Msg: {self.paint_msg}", )
 
             # 又是一个支持中文路径小技巧
             bg_temp_path = Path("temp.png")
