@@ -1,17 +1,18 @@
 import logging
 import math
-from os import PathLike
-import traceback
+import threading
 import time
+import traceback
+import urllib.request
 from collections import deque
+from os import PathLike
 from pathlib import Path
 from typing import NamedTuple
-import threading
-import urllib.request
 
 import cv2
 import numpy as np
-from rich import get_console, print as rprint
+from rich import get_console
+from rich import print as rprint
 from rich.logging import RichHandler
 from rich.progress import (
     BarColumn,

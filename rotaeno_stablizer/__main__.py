@@ -1,7 +1,7 @@
 import argparse
+import logging
 import tomllib
 from pathlib import Path
-import logging
 
 from rich import print as rprint
 from rich_argparse import RichHelpFormatter

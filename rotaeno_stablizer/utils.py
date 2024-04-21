@@ -1,8 +1,9 @@
+import sys
+
+import numpy as np
+from rich import get_console
 from rich.progress import ProgressColumn, Task
 from rich.text import Text
-from rich import get_console
-import numpy as np
-import sys
 
 
 class FPSColumn(ProgressColumn):
@@ -14,7 +15,6 @@ class FPSColumn(ProgressColumn):
         if speed is None:
             return Text("FPS: ?", style="progress.data.speed")
         return Text(f"FPS: {int(speed)}", style="progress.data.speed")
-
 
 def paste_image(background_image: np.ndarray,
                 foreground_image: np.ndarray, offset_x: int,
@@ -71,8 +71,8 @@ else:
 
     def getch() -> str:
         import sys
-        import tty
         import termios
+        import tty
         fd = sys.stdin.fileno()
         old = termios.tcgetattr(fd)
         try:
@@ -99,5 +99,3 @@ def ask_confirm(text: str, default=True) -> bool:
         elif get == "n":
             return False
         console.print("[prompt.invalid]Please enter Y or N")
-
-    
