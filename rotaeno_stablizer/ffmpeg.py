@@ -1,14 +1,19 @@
+import itertools
 import json
 import logging
-from queue import Queue
 import re
-from rich.markup import escape
 import subprocess
+import uuid
+from contextlib import contextmanager
+from multiprocessing.pool import ThreadPool
 from os import PathLike
 from pathlib import Path
+from queue import Queue
 from shutil import which
+from subprocess import PIPE
 
 import numpy as np
+from rich.markup import escape
 
 log = logging.getLogger("rich")
 
@@ -50,7 +55,7 @@ def audio_copy(audio_from: str | PathLike, audio_to: str | PathLike):
             get_ffmpeg(), "-y", "-i", audio_from, "-i", audio_temp,
             "-map", "0:a", "-map", "1:v", "-c", "copy", audio_to
         ],
-                                stderr=subprocess.PIPE)
+                                stderr=PIPE)
         _, stderr = pipe.communicate()
     except Exception as e:
         if stderr is None:
@@ -82,9 +87,7 @@ class FFMpegReader:
             get_ffprobe(), "-v", "quiet", "-print_format", "json",
             "-show_streams", self.input_file
         ]
-        pipe = subprocess.Popen(commands,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
+        pipe = subprocess.Popen(commands, stdout=PIPE, stderr=PIPE)
         info = json.loads(pipe.communicate()[0])
         try:
             video_info = next(stream for stream in info["streams"]
@@ -92,7 +95,7 @@ class FFMpegReader:
         except StopIteration:
             raise ValueError(
                 "Cannot found video infomation in Stream.")
-        
+
         video_fps = float(video_info["nb_frames"]) / float(
             video_info["duration"])
         height, width = video_info["height"], video_info["width"]
@@ -100,7 +103,7 @@ class FFMpegReader:
                 and video_info["side_data_list"][0]["rotation"] % 360
                 in [90, 270]):
             height, width = width, height
-        
+
         log.debug(f"Video Width: {width}, Height: {height}")
         duration = float(video_info["duration"])
         log.debug(f"Video duration: {duration:.2f}s")
@@ -117,7 +120,7 @@ class FFMpegReader:
             get_ffmpeg(), "-i", self.input_file, "-vf", "vfrdet",
             "-an", "-f", "null", "-"
         ]
-        pipe = subprocess.Popen(commands, stderr=subprocess.PIPE)
+        pipe = subprocess.Popen(commands, stderr=PIPE)
         vfr_str = pipe.communicate()[1].splitlines()[-1].decode()
         pattern = r'VFR:(\d+\.\d+)'
         match = re.search(pattern, vfr_str)
@@ -128,7 +131,8 @@ class FFMpegReader:
 
     def start(self):
         commands = [
-            get_ffmpeg(), "-loglevel", "error", "-i", self.input_file
+            get_ffmpeg(), "-loglevel", "error", "-c:v", "hevc_cuvid",
+            "-i", self.input_file
         ]
         ("-filter_complex "
          "[0:v]fps=60[original];"
@@ -156,8 +160,8 @@ class FFMpegReader:
                   extra={"markup": True})
         frame_size = width * height * 3
         pipe = subprocess.Popen(commands,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
+                                stdout=PIPE,
+                                stderr=PIPE,
                                 bufsize=frame_size + 1)
         return pipe, height, width
 
@@ -235,9 +239,9 @@ class FFMpegWriter:
                   extra={"markup": True})
         self.pipe = subprocess.Popen(
             commands,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdin=PIPE,
+            stdout=PIPE,
+            stderr=PIPE,
             bufsize=self.height * self.width * 4 + 1)
         return self
 
@@ -256,7 +260,101 @@ class FFMpegWriter:
                     self.pipe.stdin.write(frame)
                 except (OSError, BrokenPipeError) as e:
                     assert self.pipe.stderr
-                    line = self.pipe.stderr.read().decode(encoding="UTF-8").splitlines()
+                    line = self.pipe.stderr.read().decode(
+                        encoding="UTF-8").splitlines()
                     raise FFMpegError("\n".join(line)) from e
                 self.queue.task_done()
 
+
+class FFMpegHWTest:
+
+    def __init__(self) -> None:
+        ...
+
+    def get_available_codcs(
+            self, codec: str) -> tuple[list[str], list[str]]:
+        commands = ["ffmpeg", "-codecs"]
+        encoder_pattern = r'\((encoders:[^\)]+)\)'
+        decoder_pattern = r'\((decoders:[^\)]+)\)'
+        with subprocess.Popen(commands, stdout=PIPE,
+                              stderr=PIPE) as popen:
+            assert popen.stdout
+            try:
+                l = next(
+                    l[8:] for line in popen.stdout.readlines()
+                    if codec +
+                    " " == (l := line.decode("UTF-8"))[8:9 +
+                                                       len(codec)])
+            except StopIteration:
+                raise FFMpegError(
+                    f"Cannot fount codecs in ffmpeg: {codec}")
+            encoder_searcher = re.search(encoder_pattern, l)
+            assert encoder_searcher is not None
+            encoders = encoder_searcher.group(1).split()[1:]
+            decoder_searcher = re.search(decoder_pattern, l)
+            assert decoder_searcher is not None
+            decoders = decoder_searcher.group(1).split()[1:]
+        return encoders, decoders
+
+    @contextmanager
+    def generate_decoder_video(self, encoder):
+        filename = Path(f"temp_{uuid.uuid4()}.mp4")
+        commands = [
+            "ffmpeg", "-f", "lavfi", "-i", "nullsrc", "-c:v", encoder,
+            "-frames:v", "1", filename, "-y"
+        ]
+        subprocess.run(commands, stdout=PIPE, stderr=PIPE)
+        yield filename
+        filename.unlink()
+
+    def test_encoder(self, encoder: str):
+        commands = [
+            "ffmpeg", "-f", "lavfi", "-i", "nullsrc", "-c:v", encoder,
+            "-frames:v", "1", "-f", "null", "-"
+        ]
+        proc = subprocess.run(commands, stdout=PIPE, stderr=PIPE)
+
+        return not proc.returncode
+
+    def test_decoder(self, decoder: str, path):
+        commands = [
+            "ffmpeg", "-c:v", decoder, "-i", path, "-frames:v", "1",
+            "-f", "null", "-"
+        ]
+        proc = subprocess.run(commands, stdout=PIPE, stderr=PIPE)
+
+        return not proc.returncode
+
+    def test_encoders(self, encoders: list[str]):
+        with ThreadPool() as pool:
+            available_encoders = [
+                encoder for encoder, available in zip(
+                    encoders, pool.map(self.test_encoder, encoders))
+                if available
+            ]
+        return available_encoders
+
+    def test_decoders(self, decoders: list[str]):
+        with (self.generate_decoder_video("libx265") as
+              file, ThreadPool() as pool):
+            available_decoders = [
+                decoder for decoder, available in zip(
+                    decoders,
+                    pool.starmap(
+                        self.test_decoder,
+                        zip(decoders, itertools.repeat(file))))
+                if available
+            ]
+        return available_decoders
+
+    def run(self, codec: str):
+        encoders, decoders = self.get_available_codcs(codec)
+        available_encoders = self.test_encoders(encoders)
+        available_decoders = self.test_decoders(decoders)
+
+
+if __name__ == "__main__":
+
+    import time
+    f = FFMpegHWTest()
+    f.run("hevc")
