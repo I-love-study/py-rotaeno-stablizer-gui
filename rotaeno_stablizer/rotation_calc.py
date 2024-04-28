@@ -6,23 +6,26 @@ import numpy as np
 class RotationCalc:
     """通过画面计算旋转角度"""
 
-    def __init__(self, version: int = 2, window_size=3) -> None:
+    def __init__(self, version: int = 2, window_size: int=3, ratio: int = 1) -> None:
         if version not in [1, 2]:
             raise ValueError("Unsupport Rotation Version")
         self.window_size = window_size
         self.deque = deque(maxlen=self.window_size)
         self.method = self.compute_rotation_v2 if version == 2 else self.compute_rotation
         self.wake_up_num = (self.window_size - 1) // 2
+        self.ratio = ratio
+        self.O = int(5 * ratio)
+        self.S = int(3 * ratio)
 
     def get_points(
         self, frame: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         # Sample colors
-        O, S = 5, 3
-        bottom_left = frame[-O:-O + S, O:O + S].mean(axis=(0, 1))
-        top_left = frame[O:O + S, O:O + S].mean(axis=(0, 1))
-        bottom_right = frame[-O:-O + S, -O:-O + S].mean(axis=(0, 1))
-        top_right = frame[O:O + S, -O:-O + S].mean(axis=(0, 1))
+
+        bottom_left = frame[-self.O:-self.O + self.S, self.O:self.O + self.S].mean(axis=(0, 1))
+        top_left = frame[self.O:self.O + self.S, self.O:self.O + self.S].mean(axis=(0, 1))
+        bottom_right = frame[-self.O:-self.O + self.S, -self.O:-self.O + self.S].mean(axis=(0, 1))
+        top_right = frame[self.O:self.O + self.S, -self.O:-self.O + self.S].mean(axis=(0, 1))
         return (top_left, top_right, bottom_left, bottom_right)
 
     def compute_rotation(self, left: np.ndarray, right: np.ndarray,
