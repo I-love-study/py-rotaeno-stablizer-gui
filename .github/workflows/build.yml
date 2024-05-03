@@ -51,6 +51,10 @@ jobs:
         mv standalone_tools/opencv-setup-hack.py opencv-python/setup.py
         pip install ./opencv-python --verbose
 
+    - name: Download ffmpeg
+      run: |
+        curl -JLO https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl-shared.zip
+
     - uses: Nuitka/Nuitka-Action@main
       with:
         nuitka-version: main
@@ -71,15 +75,46 @@ jobs:
       with:
         name: Rotaeno Stablizer
         path: ./rotaeno_stablizer.7z
-
-    - name: get ffmpeg with lgpl
+    
+    - name: Put ffmpeg in folder
       run: |
-        curl -JLO https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl-shared.zip
-        7z x ffmpeg-master-latest-win64-lgpl-shared.zip ffmpeg-master-latest-win64-lgpl-shared/bin/*
-        mv ffmpeg-master-latest-win64-lgpl-shared/bin build/rotaeno_stablizer.dist/ffmpeg
+        7z x ffmpeg-master-latest-win64-lgpl-shared.zip ffmpeg-master-latest-win64-lgpl-shared/*
+        mv ffmpeg-master-latest-win64-lgpl-shared build/rotaeno_stablizer.dist/ffmpeg
         7z a -t7z rotaeno_stablizer_with_ffmpeg.7z -mx=9 ./build/rotaeno_stablizer.dist
   
     - uses: actions/upload-artifact@v4
       with:
         name: Rotaeno Stablizer with FFMpeg
         path: ./rotaeno_stablizer_with_ffmpeg.7z
+
+    - uses: Nuitka/Nuitka-Action@main
+      with:
+        nuitka-version: main
+        script-name: rotaeno_stablizer.gui
+        standalone: true
+        onefile: false
+        #enable-plugins: upx
+
+    - name: Move config.toml to dist
+      run: |
+        mv config.toml ./build/rotaeno_stablizer.dist/config.toml
+
+    - name: Turn dist to 7z file
+      run: |
+        7z a -t7z rotaeno_stablizer_gui.7z -mx=9 ./build/rotaeno_stablizer.gui.dist
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: Rotaeno Stablizer
+        path: ./rotaeno_stablizer_gui.7z
+    
+    - name: Put ffmpeg in folder
+      run: |
+        7z x ffmpeg-master-latest-win64-lgpl-shared.zip ffmpeg-master-latest-win64-lgpl-shared/*
+        mv ffmpeg-master-latest-win64-lgpl-shared build/rotaeno_stablizer.gui.dist/ffmpeg
+        7z a -t7z rotaeno_stablizer_gui_with_ffmpeg.7z -mx=9 ./build/rotaeno_stablizer.gui.dist
+  
+    - uses: actions/upload-artifact@v4
+      with:
+        name: Rotaeno Stablizer with FFMpeg
+        path: ./rotaeno_stablizer_gui_with_ffmpeg.7z
