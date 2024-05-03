@@ -63,9 +63,9 @@ jobs:
         onefile: false
         #enable-plugins: upx
 
-    - name: Move config.toml to dist
+    - name: Copy config.toml to dist
       run: |
-        mv config.toml ./build/rotaeno_stablizer.dist/config.toml
+        cp config.toml ./build/rotaeno_stablizer.dist
 
     - name: Turn dist to 7z file
       run: |
@@ -87,21 +87,26 @@ jobs:
         name: Rotaeno Stablizer with FFMpeg
         path: ./rotaeno_stablizer_with_ffmpeg.7z
 
+    - name: Move gui
+      run: |
+        mv standalone_tools/rotaeno_stablizer_gui.py rotaeno_stablizer_gui.py
+
     - uses: Nuitka/Nuitka-Action@main
       with:
         nuitka-version: main
-        script-name: rotaeno_stablizer.gui
+        script-name: rotaeno_stablizer_gui.py
         standalone: true
         onefile: false
+        disable-console: true
         enable-plugins: tk-inter
 
-    - name: Move config.toml to dist
+    - name: Copy config.toml to dist
       run: |
-        mv config.toml ./build/rotaeno_stablizer.dist/config.toml
+        cp config.toml ./build/rotaeno_stablizer_gui.dist
 
     - name: Turn dist to 7z file
       run: |
-        7z a -t7z rotaeno_stablizer_gui.7z -mx=9 ./build/rotaeno_stablizer.gui.dist
+        7z a -t7z rotaeno_stablizer_gui.7z -mx=9 ./build/rotaeno_stablizer_gui.dist
 
     - uses: actions/upload-artifact@v4
       with:
@@ -112,7 +117,7 @@ jobs:
       run: |
         7z x ffmpeg-master-latest-win64-lgpl-shared.zip ffmpeg-master-latest-win64-lgpl-shared/*
         mv ffmpeg-master-latest-win64-lgpl-shared build/rotaeno_stablizer.gui.dist/ffmpeg
-        7z a -t7z rotaeno_stablizer_gui_with_ffmpeg.7z -mx=9 ./build/rotaeno_stablizer.gui.dist
+        7z a -t7z rotaeno_stablizer_gui_with_ffmpeg.7z -mx=9 ./build/rotaeno_stablizer_gui.dist
   
     - uses: actions/upload-artifact@v4
       with:

@@ -336,10 +336,13 @@ class Rotaeno:
 
         event = threading.Event()
         is_exception = threading.Event()
+        exception_arg = None
 
         def excepthook(args):
+            nonlocal exception_arg
             traceback.print_exception(args.exc_type, args.exc_value,
                                     args.exc_traceback)
+            exception_arg = args
             is_exception.set()
             event.set()
 
@@ -370,7 +373,7 @@ class Rotaeno:
 
         event.wait()
         if is_exception.is_set():
-            exit()
+            return False, exception_arg
 
         rprint(":white_check_mark:[2/3]Rendering Video... Complete")
 
@@ -380,6 +383,7 @@ class Rotaeno:
         with self.con.status("[3/3]Coping audio...") as status:
             ffmpeg.audio_copy(input_reader.input_file, output_video)
         rprint(":white_check_mark:[3/3]Coping audio... Complete")
+        return True, None
 
     def run(self,
             input_video: str | PathLike,
