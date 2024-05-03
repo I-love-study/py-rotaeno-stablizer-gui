@@ -4,6 +4,7 @@ from pathlib import Path
 from queue import Queue
 from threading import Thread
 from tkinter.filedialog import askopenfilename
+import traceback
 import ttkbootstrap as ttk
 
 from ttkbootstrap.constants import *
@@ -314,21 +315,36 @@ class Gui(ttk.Frame):
         }
 
         import threading
+        exception_args = None
 
         event = threading.Event()
+
         def check_event():
             if not event.is_set():
                 self.master.after(100, check_event)
                 return
-            Messagebox.show_info("Process Success")
+            if exception_args is not None:
+                err = traceback.format_exception(
+                    exception_args.exc_type,
+                    exception_args.exc_value,
+                    exception_args.exc_traceback,
+                    limit=2)
+                Messagebox.show_error(
+                    "".join(err),
+                    (f"{exception_args.exc_type.__name__}: "
+                     f"{exception_args.exc_value}"))
+            else:
+                Messagebox.show_info("Process Success")
             exit()
-            
 
         def run_stablizer():
-            rotaeno.run_gui(self.reader,
-                            self.out_path_var.get(),
-                            **encoder_arg,
-                            progressbar=self.progressbar)
+            nonlocal exception_args
+            r = rotaeno.run_gui(self.reader,
+                                self.out_path_var.get(),
+                                **encoder_arg,
+                                progressbar=self.progressbar)
+            if not r[0]:
+                exception_args = r[1]
             event.set()
 
         thread = threading.Thread(target=run_stablizer, daemon=True)
