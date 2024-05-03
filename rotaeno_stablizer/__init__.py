@@ -8,6 +8,10 @@ from collections import deque
 from os import PathLike
 from pathlib import Path
 from dataclasses import dataclass
+from typing import Callable, TYPE_CHECKING
+if TYPE_CHECKING:
+    from tkinter.ttk import Progressbar
+
 
 import cv2
 import numpy as np
@@ -34,6 +38,7 @@ class PaintMsg:
     output_size: tuple[int, int]
     circle_radius: float
     circle_thickness: float
+    resize_ratio: float
     background: np.ndarray
     image_alpha: np.ndarray
 
@@ -156,13 +161,16 @@ class Rotaeno:
             if self.display_all:
                 resize_ratio = video_a / output_height_want
                 video_a = output_height_want
-                video_resize = (video_crop[0] / resize_ratio,
+                video_crop = (video_crop[0] / resize_ratio,
                                 video_crop[1] / resize_ratio)
             else:
                 resize_ratio = video_crop[1] / output_height_want
-                video_resize = (video_crop[0] / resize_ratio,
+                video_crop = (width / resize_ratio,
                                 output_height_want)
+            video_resize = (width / resize_ratio,
+                            height / resize_ratio)
         else:
+            resize_ratio = 1
             video_resize = (width, height)
 
         circle_radius = (1.5575 * video_crop[1]) // 2
@@ -196,11 +204,13 @@ class Rotaeno:
                                               circle_radius,
                                               circle_thickness)
 
+
         return PaintMsg(video_resize=video_resize,
                         video_crop=video_crop,
                         output_size=output_size,
                         circle_radius=circle_radius,
                         circle_thickness=circle_thickness,
+                        resize_ratio = resize_ratio,
                         background=background,
                         image_alpha=alpha)
 
@@ -232,10 +242,8 @@ class Rotaeno:
         # 获取变换矩阵
         M = cv2.getRotationMatrix2D(
             (frame.shape[1] // 2, frame.shape[0] // 2), angle, 1)
-        # 如果全部显示
-        if self.display_all:
-            M[0, 2] += (self.paint_msg.output_size[0] - width) // 2
-            M[1, 2] += (self.paint_msg.output_size[1] - height) // 2
+        M[0, 2] += (self.paint_msg.output_size[0] - width) // 2
+        M[1, 2] += (self.paint_msg.output_size[1] - height) // 2
         rotated_frame = cv2.warpAffine(
             frame,
             M,
@@ -245,43 +253,133 @@ class Rotaeno:
 
     def process_video(self, input_reader: ffmpeg.FFMpegReader,
                       output_writer: ffmpeg.FFMpegWriter,
-                      frame_count: int):
+                      frame_callback: Callable):
 
-        with Progress(
-                TextColumn(
-                    "[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(), TimeElapsedColumn(),
-                TimeRemainingColumn(), FPSColumn()) as progress:
-            #先给稳定器投喂点数据
-            wakeup_elems = []
-            for _ in range(self.rotation_method.wake_up_num):
-                wakeup_elems.append(input_reader.queue.get())
-                input_reader.queue.task_done()
-            self.rotation_method.wake_up(wakeup_elems)
-            angle_deque = deque(
-                wakeup_elems, maxlen=self.rotation_method.window_size)
-            task = progress.add_task(
-                ":hourglass_flowing_sand:[2/3]Rendering Video",
-                total=frame_count)
+        #先给稳定器投喂点数据
+        wakeup_elems = []
+        for _ in range(self.rotation_method.wake_up_num):
+            wakeup_elems.append(input_reader.queue.get())
+            input_reader.queue.task_done()
+        self.rotation_method.wake_up(wakeup_elems)
+        angle_deque = deque(
+            wakeup_elems, maxlen=self.rotation_method.window_size)
 
-            for f in input_reader.read():
-                if f is None:
-                    break
-                angle_deque.append(f)
-                angle = self.rotation_method.update(f)
-                a = self.process_frame(
-                    angle_deque[self.rotation_method.wake_up_num],
-                    angle)
-                output_writer.queue.put(a)
-                progress.advance(task)
-            for f in range(self.rotation_method.wake_up_num):
-                output_writer.queue.put(
-                    self.process_frame(angle_deque.popleft(),
-                                       self.rotation_method.update()))
-                progress.advance(task)
-            output_writer.queue.put(None)
-            #progress.remove_task(task)
+
+        for f in input_reader.read():
+            if f is None:
+                break
+            angle_deque.append(f)
+            angle = self.rotation_method.update(f)
+            a = self.process_frame(
+                angle_deque[self.rotation_method.wake_up_num],
+                angle)
+            output_writer.queue.put(a)
+            frame_callback()
+        for f in range(self.rotation_method.wake_up_num):
+            output_writer.queue.put(
+                self.process_frame(angle_deque.popleft(),
+                                    self.rotation_method.update()))
+            frame_callback()
+        output_writer.queue.put(None)
+
+    def run_gui(self,
+            input_reader: ffmpeg.FFMpegReader,
+            output_video: str | PathLike,
+            codec: str,
+            bitrate: str,
+            fps: float | None = None,
+            progressbar: "Progressbar | None" = None):
+        assert progressbar is not None
+        if fps:
+            input_reader.fps = fps
+        with self.con.status("[1/3]Loading Video...") as status:
+            self.paint_msg = self._get_video_info(
+                input_reader.info["height"],
+                input_reader.info["width"], self.height)
+            log.debug(f"Paint Msg: {self.paint_msg}", )
+
+            # 又是一个支持中文路径小技巧
+            bg_temp_path = Path("temp.png")
+            cv2.imencode('.png', self.paint_msg.background,
+                         [cv2.IMWRITE_PNG_COMPRESSION, 9
+                          ])[1].tofile(bg_temp_path)
+            log.debug(
+                f"Save background image in {bg_temp_path.absolute()}")
+            fps_output = (input_reader.info["fps"]
+                          if input_reader.hope_fps is None else
+                          input_reader.hope_fps)
+            if fps: fps_output = fps
+
+            width, height = self.paint_msg.output_size
+
+            log.debug(
+                f"Output Video Width: {width}, Height: {height}")
+            output_writer = ffmpeg.FFMpegWriter(
+                output_video,
+                width=width,
+                height=height,
+                fps=fps_output,
+                encoder=codec,
+                bitrate=bitrate,
+                background_image=bg_temp_path)
+        rprint(":white_check_mark:[1/3]Loading Video... Complete")
+
+        frame_count = int(input_reader.info["duration"] * fps_output)
+
+        if (self.height is not None and input_reader.info["height"]
+                != self.paint_msg.video_resize[1]):
+            log.debug(
+                "Resize Input Video to "
+                f"{self.paint_msg.video_resize[0]}x{self.paint_msg.video_resize[1]}"
+            )
+            input_reader.resize = self.paint_msg.video_resize
+
+        event = threading.Event()
+        is_exception = threading.Event()
+
+        def excepthook(args):
+            traceback.print_exception(args.exc_type, args.exc_value,
+                                    args.exc_traceback)
+            is_exception.set()
+            event.set()
+
+        threading.excepthook = excepthook
+
+        list_task = [
+            threading.Thread(target=input_reader.start_process,
+                            daemon=True),
+            threading.Thread(
+                target=self.process_video,
+                args=[input_reader, output_writer, lambda: progressbar.step(100 / frame_count)],
+                daemon=True),
+            threading.Thread(target=output_writer.start_process,
+                            daemon=True)
+        ]
+
+        for i in list_task:
+            log.debug(f"Start Thread {i}")
+            i.start()
+
+
+        def join_hook():
+            for i in list_task:
+                i.join()
+            event.set()
+
+        threading.Thread(target=join_hook, daemon=True).start()
+
+        event.wait()
+        if is_exception.is_set():
+            exit()
+
+        rprint(":white_check_mark:[2/3]Rendering Video... Complete")
+
+        # 删了临时文件
+        bg_temp_path.unlink()
+        log.debug(f"Del {bg_temp_path.absolute()}")
+        with self.con.status("[3/3]Coping audio...") as status:
+            ffmpeg.audio_copy(input_reader.input_file, output_video)
+        rprint(":white_check_mark:[3/3]Coping audio... Complete")
 
     def run(self,
             input_video: str | PathLike,
@@ -316,7 +414,7 @@ class Rotaeno:
                 width=width,
                 height=height,
                 fps=fps_output,
-                codec=codec,
+                encoder=codec,
                 bitrate=bitrate,
                 background_image=bg_temp_path)
         rprint(":white_check_mark:[1/3]Loading Video... Complete")
@@ -331,31 +429,46 @@ class Rotaeno:
             )
             input_reader.resize = self.paint_msg.video_resize
 
-        list_task = [
-            threading.Thread(target=input_reader.start_process,
-                             daemon=True),
-            threading.Thread(
-                target=self.process_video,
-                args=[input_reader, output_writer, frame_count],
-                daemon=True),
-            threading.Thread(target=output_writer.start_process,
-                             daemon=True)
-        ]
+            event = threading.Event()
+            is_exception = threading.Event()
 
-        event = threading.Event()
-        is_exception = threading.Event()
+            def excepthook(args):
+                traceback.print_exception(args.exc_type, args.exc_value,
+                                        args.exc_traceback)
+                is_exception.set()
+                event.set()
 
-        def excepthook(args):
-            traceback.print_exception(args.exc_type, args.exc_value,
-                                      args.exc_traceback)
-            is_exception.set()
-            event.set()
+            threading.excepthook = excepthook
 
-        threading.excepthook = excepthook
+        with Progress(
+                TextColumn(
+                    "[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(), TimeElapsedColumn(),
+                TimeRemainingColumn(), FPSColumn()) as progress:
+            
+            task = progress.add_task(
+                ":hourglass_flowing_sand:[2/3]Rendering Video",
+                total=frame_count)
 
-        for i in list_task:
-            log.debug(f"Start Thread {i}")
-            i.start()
+            list_task = [
+                threading.Thread(target=input_reader.start_process,
+                                daemon=True),
+                threading.Thread(
+                    target=self.process_video,
+                    args=[input_reader, output_writer, lambda: progress.advance(task)],
+                    daemon=True),
+                threading.Thread(target=output_writer.start_process,
+                                daemon=True)
+            ]
+
+
+
+            for i in list_task:
+                log.debug(f"Start Thread {i}")
+                i.start()
+
+
 
         def join_hook():
             for i in list_task:
@@ -385,5 +498,4 @@ if __name__ == "__main__":
         #auto_crop=False,
         display_all=True,
         window_size=5)
-
     a.run("test.mp4", "test_a.mp4", "hevc_nvnec", "8m")

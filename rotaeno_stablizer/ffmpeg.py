@@ -5,6 +5,7 @@ import re
 import subprocess
 import uuid
 from contextlib import contextmanager
+from functools import cached_property
 from multiprocessing.pool import ThreadPool
 from os import PathLike
 from pathlib import Path
@@ -22,12 +23,23 @@ class FFMpegError(Exception):
     ...
 
 
+def gpu_perfer_order(coders: list[str]):
+    ret = []
+    for coder in coders:
+        for gpu_fix in ["nvenc", "vaapi", "qsv"]:
+            if gpu_fix in coder:
+                ret.append(coder)
+                break
+    ret += [c for c in coders if c not in ret]
+    return ret
+
+
 def get_ffmpeg():
     """获取本机拥有的编解码器"""
     if which("ffmpeg"):
         return "ffmpeg"
-    elif Path("ffmpeg/ffmpeg.exe").exists():
-        return "ffmpeg/ffmpeg.exe"
+    elif Path("ffmpeg/bin/ffmpeg.exe").exists():
+        return "ffmpeg/bin/ffmpeg.exe"
 
     Warning("Couldn't find ffmpeg, maybe it'll not work")
     return "ffmpeg"
@@ -37,8 +49,8 @@ def get_ffprobe():
     """获取本机拥有的编解码器"""
     if which("ffprobe"):
         return "ffprobe"
-    elif Path("ffmpeg/ffprobe.exe").exists():
-        return "ffmpeg/ffprobe.exe"
+    elif Path("ffmpeg/bin/ffprobe.exe").exists():
+        return "ffmpeg/bin/ffprobe.exe"
 
     Warning("Couldn't find ffprobe, maybe it'll not work")
     return "ffprobe"
@@ -70,17 +82,27 @@ class FFMpegReader:
 
     def __init__(self,
                  input_name: str | PathLike,
-                 fps: float | None = None) -> None:
+                 fps: float | None = None,
+                 decoder: str | None = None) -> None:
         self.input_file = Path(input_name)
-        self.is_vfr = self.vfr_check()
         self.info = self.get_info()
-        common_fps = [30, 60, 75, 90, 120, 144, 180, 240]
-        self.hope_fps = min(common_fps,
-                            key=lambda x: abs(x - self.info["fps"])
-                            ) if fps is None and self.is_vfr else fps
-        log.debug(f"Output Video fps: {self.hope_fps}")
+        self.fps = fps
         self.queue = Queue(5)
         self.resize: tuple[int, int] | None = None
+        self.decoder = decoder
+
+    @cached_property
+    def is_vfr(self):
+        return self.vfr_check()
+
+    @cached_property
+    def hope_fps(self):
+        common_fps = [30, 60, 75, 90, 120, 144, 180, 240]
+        hope_fps = (min(common_fps,
+                    key=lambda x: abs(x - self.info["fps"]))
+                if self.fps is None and self.is_vfr else self.fps)
+        log.debug(f"Output Video fps: {hope_fps}")
+        return hope_fps
 
     def get_info(self):
         commands = [
@@ -99,11 +121,13 @@ class FFMpegReader:
         video_fps = float(video_info["nb_frames"]) / float(
             video_info["duration"])
         height, width = video_info["height"], video_info["width"]
+        codec_name = video_info["codec_name"]
         if ("side_data_list" in video_info
                 and video_info["side_data_list"][0]["rotation"] % 360
                 in [90, 270]):
             height, width = width, height
 
+        log.debug(f"Video coder: {codec_name}")
         log.debug(f"Video Width: {width}, Height: {height}")
         duration = float(video_info["duration"])
         log.debug(f"Video duration: {duration:.2f}s")
@@ -112,7 +136,8 @@ class FFMpegReader:
             "fps": video_fps,
             "height": height,
             "width": width,
-            "duration": duration
+            "duration": duration,
+            "codec_name": codec_name
         }
 
     def vfr_check(self):
@@ -121,7 +146,7 @@ class FFMpegReader:
             "-an", "-f", "null", "-"
         ]
         pipe = subprocess.Popen(commands, stderr=PIPE)
-        vfr_str = pipe.communicate()[1].splitlines()[-1].decode()
+        vfr_str = pipe.communicate()[1].decode()
         pattern = r'VFR:(\d+\.\d+)'
         match = re.search(pattern, vfr_str)
         assert match is not None
@@ -130,10 +155,10 @@ class FFMpegReader:
         return target_number
 
     def start(self):
-        commands = [
-            get_ffmpeg(), "-loglevel", "error", "-c:v", "hevc_cuvid",
-            "-i", self.input_file
-        ]
+        commands = [get_ffmpeg(), "-loglevel", "error"]
+        if self.decoder is not None:
+            commands += ["-c:v", self.decoder]
+        commands += ["-i", self.input_file]
         ("-filter_complex "
          "[0:v]fps=60[original];"
          "[original]scale=-1:720, crop=1280:720[cropd]"
@@ -201,19 +226,19 @@ class FFMpegWriter:
             height: int,
             fps: float,
             pix_fmt: str = "yuv420p",
-            codec: str = "libx265",
-            bitrate: str = "8M",
+            encoder: str | None = None,
+            bitrate: str | None = None,
             background_image: str | PathLike | None = None) -> None:
         self.output_video = output_video
         self.height = height
         self.width = width
         self.fps = fps
         self.pix_fmt = pix_fmt
-        self.codec = codec
         self.background_image = background_image
         self.bitrate = bitrate
         self.pipe = None
         self.queue = Queue(5)
+        self.encoder = encoder
 
     def start(self):
         commands = [get_ffmpeg(), "-y", "-loglevel", "warning"]
@@ -229,11 +254,13 @@ class FFMpegWriter:
                 "-filter_complex",
                 f"[0:v][1:v]overlay=format=yuv420[v]", "-map", "[v]"
             ]
-        commands += [
-            "-r",
-            str(self.fps), "-c:v", self.codec, "-pix_fmt",
-            self.pix_fmt, "-b:v", self.bitrate, self.output_video
-        ]
+        if self.encoder is not None:
+            commands += ["-c:v", self.encoder]
+        commands += ["-r", str(self.fps), "-pix_fmt", self.pix_fmt]
+        if self.bitrate is not None:
+            commands += ["-b:v", self.bitrate]
+        commands += [self.output_video]
+
         log.debug("Writer Commands: [bold green]" +
                   escape(" ".join(map(str, commands))),
                   extra={"markup": True})
@@ -271,9 +298,9 @@ class FFMpegHWTest:
     def __init__(self) -> None:
         ...
 
-    def get_available_codcs(
+    def get_available_codecs(
             self, codec: str) -> tuple[list[str], list[str]]:
-        commands = ["ffmpeg", "-codecs"]
+        commands = [get_ffmpeg(), "-codecs"]
         encoder_pattern = r'\((encoders:[^\)]+)\)'
         decoder_pattern = r'\((decoders:[^\)]+)\)'
         with subprocess.Popen(commands, stdout=PIPE,
@@ -300,8 +327,8 @@ class FFMpegHWTest:
     def generate_decoder_video(self, encoder):
         filename = Path(f"temp_{uuid.uuid4()}.mp4")
         commands = [
-            "ffmpeg", "-f", "lavfi", "-i", "nullsrc", "-c:v", encoder,
-            "-frames:v", "1", filename, "-y"
+            get_ffmpeg(), "-f", "lavfi", "-i", "nullsrc", "-c:v",
+            encoder, "-frames:v", "1", filename, "-y"
         ]
         subprocess.run(commands, stdout=PIPE, stderr=PIPE)
         yield filename
@@ -309,8 +336,8 @@ class FFMpegHWTest:
 
     def test_encoder(self, encoder: str):
         commands = [
-            "ffmpeg", "-f", "lavfi", "-i", "nullsrc", "-c:v", encoder,
-            "-frames:v", "1", "-f", "null", "-"
+            get_ffmpeg(), "-f", "lavfi", "-i", "nullsrc", "-c:v",
+            encoder, "-frames:v", "1", "-f", "null", "-"
         ]
         proc = subprocess.run(commands, stdout=PIPE, stderr=PIPE)
 
@@ -318,8 +345,8 @@ class FFMpegHWTest:
 
     def test_decoder(self, decoder: str, path):
         commands = [
-            "ffmpeg", "-c:v", decoder, "-i", path, "-frames:v", "1",
-            "-f", "null", "-"
+            get_ffmpeg(), "-c:v", decoder, "-i", path, "-frames:v",
+            "1", "-f", "null", "-"
         ]
         proc = subprocess.run(commands, stdout=PIPE, stderr=PIPE)
 
@@ -347,14 +374,31 @@ class FFMpegHWTest:
             ]
         return available_decoders
 
+    @classmethod
+    def get_encoders(cls, codec: str) -> list[str]:
+        cls_ = cls()
+        encoders, _ = cls_.get_available_codecs(codec)
+        return cls_.test_encoders(encoders)
+
+    @classmethod
+    def get_decoders(cls, codec: str) -> list[str]:
+        cls_ = cls()
+        _, decoders = cls_.get_available_codecs(codec)
+        return cls_.test_decoders(decoders)
+
     def run(self, codec: str):
-        encoders, decoders = self.get_available_codcs(codec)
+        encoders, decoders = self.get_available_codecs(codec)
         available_encoders = self.test_encoders(encoders)
         available_decoders = self.test_decoders(decoders)
+        return available_encoders, available_decoders
 
 
 if __name__ == "__main__":
+    from rich.logging import RichHandler
+    logging.basicConfig(level="INFO",
+                        format="%(message)s",
+                        datefmt="[%X]",
+                        handlers=[RichHandler(rich_tracebacks=True)])
+    logging.getLogger("rich").setLevel("DEBUG")
 
-    import time
-    f = FFMpegHWTest()
-    f.run("hevc")
+    f = FFMpegReader(r"test/test_5s.mp4")
