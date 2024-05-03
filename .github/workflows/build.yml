@@ -93,7 +93,7 @@ jobs:
         script-name: rotaeno_stablizer.gui
         standalone: true
         onefile: false
-        #enable-plugins: upx
+        enable-plugins: tk-inter
 
     - name: Move config.toml to dist
       run: |
