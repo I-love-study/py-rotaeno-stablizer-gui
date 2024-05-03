@@ -110,16 +110,16 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: Rotaeno Stablizer
+        name: Rotaeno Stablizer Gui
         path: ./rotaeno_stablizer_gui.7z
     
     - name: Put ffmpeg in folder
       run: |
         7z x ffmpeg-master-latest-win64-lgpl-shared.zip ffmpeg-master-latest-win64-lgpl-shared/*
-        mv ffmpeg-master-latest-win64-lgpl-shared build/rotaeno_stablizer.gui.dist/ffmpeg
+        mv ffmpeg-master-latest-win64-lgpl-shared build/rotaeno_stablizer_gui.dist/ffmpeg
         7z a -t7z rotaeno_stablizer_gui_with_ffmpeg.7z -mx=9 ./build/rotaeno_stablizer_gui.dist
   
     - uses: actions/upload-artifact@v4
       with:
-        name: Rotaeno Stablizer with FFMpeg
+        name: Rotaeno Stablizer Gui with FFMpeg
         path: ./rotaeno_stablizer_gui_with_ffmpeg.7z
