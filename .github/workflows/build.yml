@@ -87,9 +87,11 @@ jobs:
         name: Rotaeno Stablizer with FFMpeg
         path: ./rotaeno_stablizer_with_ffmpeg.7z
 
-    - name: Move gui
+    - name: Ready for Gui
       run: |
         mv standalone_tools/rotaeno_stablizer_gui.py rotaeno_stablizer_gui.py
+        grep -v 'opencv-python-headless' requirements_gui.txt > requirements_gui_.txt
+        pip install -r requirements_gui_.txt
 
     - uses: Nuitka/Nuitka-Action@main
       with:
