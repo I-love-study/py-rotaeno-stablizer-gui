@@ -234,7 +234,7 @@ class Rotaeno:
                 frame = frame[:, offset:-offset, :]
                 width = self.paint_msg.video_crop[0]
         # 绘制圆形 alpha 通道
-        
+
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2RGBA)
         if self.circle_crop:
             frame[:,:,3] = self.paint_msg.image_alpha
@@ -282,6 +282,21 @@ class Rotaeno:
             frame_callback()
         output_writer.queue.put(None)
 
+    def process_video_cli(self, input_reader: ffmpeg.FFMpegReader,
+                      output_writer: ffmpeg.FFMpegWriter, frame_count: int):
+        with Progress(
+            TextColumn(
+                "[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(), TimeElapsedColumn(),
+            TimeRemainingColumn(), FPSColumn()) as progress:
+            
+            task = progress.add_task(
+                ":hourglass_flowing_sand:[2/3]Rendering Video",
+                total=frame_count)
+            self.process_video(input_reader, output_writer, lambda: progress.advance(task))
+        
+
     def run_gui(self,
             input_reader: ffmpeg.FFMpegReader,
             output_video: str | PathLike,
@@ -299,12 +314,15 @@ class Rotaeno:
             log.debug(f"Paint Msg: {self.paint_msg}", )
 
             # 又是一个支持中文路径小技巧
-            bg_temp_path = Path("temp.png")
-            cv2.imencode('.png', self.paint_msg.background,
-                         [cv2.IMWRITE_PNG_COMPRESSION, 9
-                          ])[1].tofile(bg_temp_path)
-            log.debug(
-                f"Save background image in {bg_temp_path.absolute()}")
+            if self.background is not None:
+                bg_temp_path = Path("temp.png")
+                cv2.imencode('.png', self.paint_msg.background,
+                            [cv2.IMWRITE_PNG_COMPRESSION, 9
+                            ])[1].tofile(bg_temp_path)
+                log.debug(
+                    f"Save background image in {bg_temp_path.absolute()}")
+            else:
+                bg_temp_path = None
             fps_output = (input_reader.info["fps"]
                           if input_reader.hope_fps is None else
                           input_reader.hope_fps)
@@ -401,8 +419,8 @@ class Rotaeno:
             # 又是一个支持中文路径小技巧
             bg_temp_path = Path("temp.png")
             cv2.imencode('.png', self.paint_msg.background,
-                         [cv2.IMWRITE_PNG_COMPRESSION, 9
-                          ])[1].tofile(bg_temp_path)
+                        [cv2.IMWRITE_PNG_COMPRESSION, 9
+                        ])[1].tofile(bg_temp_path)
             log.debug(
                 f"Save background image in {bg_temp_path.absolute()}")
             fps_output = (input_reader.info["fps"]
@@ -433,44 +451,33 @@ class Rotaeno:
             )
             input_reader.resize = self.paint_msg.video_resize
 
-            event = threading.Event()
-            is_exception = threading.Event()
+        event = threading.Event()
+        is_exception = threading.Event()
 
-            def excepthook(args):
-                traceback.print_exception(args.exc_type, args.exc_value,
-                                        args.exc_traceback)
-                is_exception.set()
-                event.set()
+        def excepthook(args):
+            traceback.print_exception(args.exc_type, args.exc_value,
+                                    args.exc_traceback)
+            is_exception.set()
+            event.set()
 
-            threading.excepthook = excepthook
+        threading.excepthook = excepthook
 
-        with Progress(
-                TextColumn(
-                    "[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(), TimeElapsedColumn(),
-                TimeRemainingColumn(), FPSColumn()) as progress:
-            
-            task = progress.add_task(
-                ":hourglass_flowing_sand:[2/3]Rendering Video",
-                total=frame_count)
-
-            list_task = [
-                threading.Thread(target=input_reader.start_process,
-                                daemon=True),
-                threading.Thread(
-                    target=self.process_video,
-                    args=[input_reader, output_writer, lambda: progress.advance(task)],
-                    daemon=True),
-                threading.Thread(target=output_writer.start_process,
-                                daemon=True)
-            ]
+        list_task = [
+            threading.Thread(target=input_reader.start_process,
+                            daemon=True),
+            threading.Thread(
+                target=self.process_video_cli,
+                args=[input_reader, output_writer, frame_count],
+                daemon=True),
+            threading.Thread(target=output_writer.start_process,
+                            daemon=True)
+        ]
 
 
 
-            for i in list_task:
-                log.debug(f"Start Thread {i}")
-                i.start()
+        for i in list_task:
+            log.debug(f"Start Thread {i}")
+            i.start()
 
 
 

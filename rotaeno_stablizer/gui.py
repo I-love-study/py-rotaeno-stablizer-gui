@@ -360,6 +360,7 @@ if __name__ == '__main__':
                         datefmt="[%X]",
                         handlers=[RichHandler(rich_tracebacks=True)])
     logging.getLogger("rich").setLevel("DEBUG")
-    app = ttk.Window("Rotaeno Stablizer", "darkly")
+    p = Path(__file__).parent / "logo.png"
+    app = ttk.Window("Rotaeno Stablizer", "darkly", p)
     Gui(app)
     app.mainloop()
