@@ -34,7 +34,7 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.12'
         architecture: 'x64'
         cache: 'pip'
     
@@ -102,9 +102,10 @@ jobs:
         disable-console: true
         enable-plugins: tk-inter
 
-    - name: Copy config.toml to dist
+    - name: Copy config.toml and logo to dist
       run: |
         cp config.toml ./build/rotaeno_stablizer_gui.dist
+        cp rotaeno_stablizer/logo.png ./build/rotaeno_stablizer_gui.dist
 
     - name: Turn dist to 7z file
       run: |
