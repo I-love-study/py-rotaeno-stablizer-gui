@@ -75,16 +75,26 @@ class RotationCalc:
 
     def wake_up(self, frames: list[np.ndarray]):
         """获取足够多的参数"""
-        if len(frames) != self.wake_up_num:
-            raise ValueError("Wrong angle count")
-        angle = self.method(*self.get_points(frames[0][:,:,:3]))
-        self.deque.append((angle - 360) if angle > 180 else angle)
-        for frame in frames[1:]:
-            angle = self.method(*self.get_points(frame[:,:,:3]))
-            if abs(angle - self.deque[-1]) > 180:
-                self.deque.append(angle - 360)
-            else:
-                self.deque.append(angle)
+        if self.window_size == 1:
+            if len(frames) != 1:
+                raise ValueError("Wrong angle count")
+            angle = self.method(*self.get_points(frames[0][:,:,:3]))
+            self.deque.append(angle)
+        else:
+            if len(frames) != self.wake_up_num + 1:  # 修正这里的判断条件
+                raise ValueError("Wrong angle count")
+            if len(frames) == 0:
+                return
+            angle = self.method(*self.get_points(frames[0][:,:,:3]))
+            self.deque.append((angle - 360) if angle > 180 else angle)
+            for frame in frames[1:]:
+                angle = self.method(*self.get_points(frame[:,:,:3]))
+                if abs(angle - self.deque[-1]) > 180:
+                    self.deque.append(angle - 360)
+                else:
+                    self.deque.append(angle)
+
+
 
     def update(self, frame: np.ndarray | None = None) -> float:
         """更新数据，并返回平滑后的数据"""
@@ -92,8 +102,12 @@ class RotationCalc:
             self.deque.popleft()
         else:
             angle = self.method(*self.get_points(frame[:,:,:3]))
-            if abs(angle - self.deque[-1]) > 180:
-                self.deque.append(angle - 360)
-            else:
+            if self.window_size == 1:
                 self.deque.append(angle)
+            else:
+                if abs(angle - self.deque[-1]) > 180:
+                    self.deque.append(angle - 360)
+                else:
+                    self.deque.append(angle)
         return sum(self.deque) / len(self.deque)
+
