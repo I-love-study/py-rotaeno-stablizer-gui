@@ -251,36 +251,29 @@ class Rotaeno:
         )
         return rotated_frame
 
-    def process_video(self, input_reader: ffmpeg.FFMpegReader,
-                      output_writer: ffmpeg.FFMpegWriter,
-                      frame_callback: Callable):
-
-        #先给稳定器投喂点数据
+    def process_video(self, input_reader: ffmpeg.FFMpegReader, output_writer: ffmpeg.FFMpegWriter, frame_callback: Callable):
+        # 先给稳定器投喂点数据
         wakeup_elems = []
-        for _ in range(self.rotation_method.wake_up_num):
-            wakeup_elems.append(input_reader.queue.get())
+        for _ in range(self.rotation_method.wake_up_num + 1):  # 修正这里的帧数获取
+            frame = input_reader.queue.get()
+            wakeup_elems.append(frame)
             input_reader.queue.task_done()
         self.rotation_method.wake_up(wakeup_elems)
-        angle_deque = deque(
-            wakeup_elems, maxlen=self.rotation_method.window_size)
-
+        angle_deque = deque(wakeup_elems, maxlen=self.rotation_method.window_size)
 
         for f in input_reader.read():
             if f is None:
                 break
             angle_deque.append(f)
             angle = self.rotation_method.update(f)
-            a = self.process_frame(
-                angle_deque[self.rotation_method.wake_up_num],
-                angle)
+            a = self.process_frame(angle_deque[self.rotation_method.wake_up_num], angle)
             output_writer.queue.put(a)
             frame_callback()
         for f in range(self.rotation_method.wake_up_num):
-            output_writer.queue.put(
-                self.process_frame(angle_deque.popleft(),
-                                    self.rotation_method.update()))
+            output_writer.queue.put(self.process_frame(angle_deque.popleft(), self.rotation_method.update()))
             frame_callback()
         output_writer.queue.put(None)
+
 
     def process_video_cli(self, input_reader: ffmpeg.FFMpegReader,
                       output_writer: ffmpeg.FFMpegWriter, frame_count: int):
