@@ -2,6 +2,9 @@
 
 Rotaeno 录屏稳定器
 
+> [!WARNING]
+> 该分支代码还处于不可用状态，请勿下载该分支代码
+
 ![Support Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FI-love-study%2Fpy-rotaeno-stablizer-gui%2Fmain%2Fpyproject.toml)
 
 ## 特点

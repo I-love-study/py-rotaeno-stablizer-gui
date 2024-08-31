@@ -3,16 +3,18 @@ authors = [
   {name = "I Love Study", email = "ilstudy@qq.com"},
 ]
 dependencies = [
-    "opencv-python-headless>=4.9.0.80",
     "rich>=13.7.1",
     "rich-argparse>=1.4.0",
+    "ffmpeg-progress-yield>=0.7.8",
+    "skia-python>=128.0b9",
+    "numpy>=2.1.0",
 ]
 description = "Default template for PDM package"
 license = {text = "LGPL-3.0"}
 name = "py-rotaeno-stablizer-gui"
 readme = "README.md"
 requires-python = ">=3.11"
-version = "0.1.0"
+version = "0.2.0"
 
 [project.optional-dependencies]
 gui = [
