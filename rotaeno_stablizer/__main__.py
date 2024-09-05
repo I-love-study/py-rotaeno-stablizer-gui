@@ -66,10 +66,10 @@ def ui(config_data):
         "请输入输出视频高度（0 为系统自动选择）",
         default=config_data["video"]["height"])
 
-    config_data["encode"]["codec"] = Prompt.ask(
-        "请选择输出视频编码器", default=config_data["encode"]["codec"])
-    config_data["encode"]["bitrate"] = Prompt.ask(
-        "请选择输出视频比特率", default=config_data["encode"]["bitrate"])
+    config_data["codec"]["encoder"] = Prompt.ask(
+        "请选择输出视频编码器", default=config_data["codec"]["encoder"])
+    config_data["codec"]["bitrate"] = Prompt.ask(
+        "请选择输出视频比特率", default=config_data["codec"]["bitrate"])
 
     rotaeno = Rotaeno(
         rotation_version=config_data["video"]["rotation_version"],
@@ -77,12 +77,10 @@ def ui(config_data):
         auto_crop=config_data["video"]["auto_crop"],
         display_all=config_data["video"]["display_all"],
         background=config_data["video"]["background"],
-        height=config_data["video"]["height"],
-        spectrogram_circle=False,
-        window_size=config_data["video"]["window_size"])
+        height=config_data["video"]["height"])
     rotaeno.run(input_file, output_file,
-                config_data["encode"]["codec"],
-                config_data["encode"]["bitrate"])
+                config_data["codec"]["encoder"],
+                config_data["codec"]["bitrate"])
 
 
 if __name__ == "__main__":
@@ -133,19 +131,18 @@ if __name__ == "__main__":
                         type=int,
                         default=config_data["video"]["height"],
                         help="输出视频高度")
-    parser.add_argument("--window-size",
-                        type=int,
-                        default=config_data["video"]["window_size"],
-                        help="平滑参数（参数越高越平滑）")
-    parser.add_argument("-c",
-                        "--codec",
+    parser.add_argument("--encoder",
                         type=str,
-                        default=config_data["encode"]["codec"],
+                        default=config_data["codec"]["encoder"],
+                        help="输出视频所使用的编码器")
+    parser.add_argument("--decoder",
+                        type=str,
+                        default=config_data["codec"]["decoder"],
                         help="输出视频所使用的编码器")
     parser.add_argument("-b",
                         "--bitrate",
                         type=str,
-                        default=config_data["encode"]["bitrate"],
+                        default=config_data["codec"]["bitrate"],
                         help="输出视频码率（不包含音频）")
     parser.add_argument("--loglevel",
                         type=str,
@@ -168,13 +165,14 @@ if __name__ == "__main__":
                           auto_crop=args.auto_crop,
                           display_all=args.display_all,
                           background=args.background,
-                          height=args.height,
-                          spectrogram_circle=False,
-                          window_size=args.window_size)
+                          height=args.height)
 
         input_video = Path(args.input_video)
         rotaeno.run(
-            input_video,
-            input_video.with_stem(input_video.stem + "_out")
+            input_video=input_video,
+            output_video=input_video.with_stem(input_video.stem +
+                                               "_out")
             if args.output_video is None else args.output_video,
-            args.codec, args.bitrate)
+            encoder=args.encoder if args.encoder else None,
+            decoder=args.decoder if args.encoder else None,
+            bitrate=args.bitrate)
