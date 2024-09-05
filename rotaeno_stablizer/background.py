@@ -125,7 +125,9 @@ class PaintMsg:
         video_resize = ceil_even(video_resize)
         video_crop = ceil_even(video_crop)
         output_size = ceil_even(output_size)
-        surface = skia.Surface(width, height)
+        image_info = skia.ImageInfo.Make(*video_crop, skia.ColorType.kGray_8_ColorType, skia.AlphaType.kOpaque_AlphaType)
+        surface = skia.Surface.MakeRaster(image_info)
+        #surface = skia.Surface(*video_crop)
         with surface as canvas:
             if circle_crop:  # 创建绘制圆形的 Paint 对象
                 paint = skia.Paint(
@@ -133,12 +135,11 @@ class PaintMsg:
                     Style=skia.Paint.kFill_Style,  # 填充圆形
                     AntiAlias=True)
 
-                # 计算圆形的半径
-                radius = width // 2
-
+                x, y = video_crop
+                x //= 2
+                y //= 2
                 # 绘制圆形
-                canvas.drawCircle(*video_crop, video_crop[0] // 2,
-                                  paint)
+                canvas.drawCircle(x, y, x, paint)
                 #print("2", time.time() - t)
             else:
                 canvas.clear(skia.ColorWHITE)
@@ -151,6 +152,7 @@ class PaintMsg:
                    resize_ratio=resize_ratio,
                    cover=get_skia_picture(cover),
                    image_alpha=surface.makeImageSnapshot())
+
 
 if __name__ == "__main__":
     a = PaintMsg.from_video_info(

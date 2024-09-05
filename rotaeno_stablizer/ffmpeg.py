@@ -11,7 +11,7 @@ from os import PathLike
 from pathlib import Path
 from queue import Queue
 from shutil import which
-from subprocess import PIPE
+from subprocess import PIPE, STDOUT
 from rich.markup import escape
 from dataclasses import InitVar, dataclass, field
 import numpy as np
@@ -87,6 +87,7 @@ class VideoInfo:
     width: int = field(init=False)
     duration: float = field(init=False)
     codec: str = field(init=False)
+    size: tuple[int, int] = field(init=False)
 
     def __post_init__(self, video_path_m):
         self.video_path = Path(video_path_m)
@@ -118,106 +119,38 @@ class VideoInfo:
         self.width = width
         self.duration = duration
         self.codec = codec_name
+        self.size = (width, height)
 
 
-class FFMpegReader:
+class FFMpegProgress:
 
-    def __init__(self,
-                 input_name: str | PathLike,
-                 fps: float | None = None,
-                 decoder: str | None = None) -> None:
-        self.input_file = Path(input_name)
-        self.info = self.get_info()
-        self.corner_size = 8
-        self.fps = fps
-        self.queue = Queue(5)
-        self.decoder = decoder
+    def __init__(self, cmd: list) -> None:
+        self.cmd = cmd
 
-    @cached_property
-    def is_vfr(self):
-        return self.vfr_check()
-
-    @cached_property
-    def hope_fps(self):
-        common_fps = [30, 60, 75, 90, 120, 144, 180, 240]
-        hope_fps = (min(common_fps,
-                        key=lambda x: abs(x - self.info["fps"]))
-                    if self.fps is None and self.is_vfr else self.fps)
-        log.debug(f"Output Video fps: {hope_fps}")
-        return hope_fps
-
-    def get_info(self):
-        commands = [
-            get_ffprobe(), "-v", "quiet", "-print_format", "json",
-            "-show_streams", self.input_file
-        ]
-        pipe = subprocess.Popen(commands, stdout=PIPE, stderr=PIPE)
-        info = json.loads(pipe.communicate()[0])
-        try:
-            video_info = next(stream for stream in info["streams"]
-                              if stream["codec_type"] == "video")
-        except StopIteration:
-            raise ValueError(
-                "Cannot found video infomation in Stream.")
-
-        video_fps = float(video_info["nb_frames"]) / float(
-            video_info["duration"])
-        height, width = video_info["height"], video_info["width"]
-        codec_name = video_info["codec_name"]
-        if ("side_data_list" in video_info
-                and video_info["side_data_list"][0]["rotation"] % 360
-                in [90, 270]):
-            height, width = width, height
-
-        log.debug(f"Video coder: {codec_name}")
-        log.debug(f"Video Width: {width}, Height: {height}")
-        duration = float(video_info["duration"])
-        log.debug(f"Video duration: {duration:.2f}s")
-        log.debug(f"Video fps: {video_fps:.2f}")
-        return {
-            "fps": video_fps,
-            "height": height,
-            "width": width,
-            "duration": duration,
-            "codec_name": codec_name
-        }
-
-    def vfr_check(self):
-        commands = [
-            get_ffmpeg(), "-i", self.input_file, "-vf", "vfrdet",
-            "-an", "-f", "null", "-"
-        ]
-        pipe = subprocess.Popen(commands, stderr=PIPE)
-        vfr_str = pipe.communicate()[1].decode()
-        pattern = r'VFR:(\d+\.\d+)'
-        match = re.search(pattern, vfr_str)
-        assert match is not None
-        target_number = float(match.group(1))
-        log.debug(f"VFR have {target_number:.2f}")
-        return target_number
-
-    def read(self, *ffmpeg_command):
-        commands = [
-            get_ffmpeg(), "-loglevel", "error", *ffmpeg_command
-        ]
-        height, width = self.corner_size * 4, self.corner_size
-        frame_size = height * width * 3
+    def process(self):
+        commands = self.cmd[0:1] + ["-progress", "-", "-nostats", "-stats_period", "0.1"
+                                    ] + self.cmd[1:]
         pipe = subprocess.Popen(commands,
+                                stdin=PIPE,
                                 stdout=PIPE,
-                                stderr=PIPE,
-                                bufsize=frame_size + 1)
-        log.debug("Running Commands: [bold green]" +
-                  escape(" ".join(map(str, commands))),
-                  extra={"markup": True})
-        stdout = pipe.stdout
-        assert stdout is not None
-        while pipe.poll() is None:
-            frame_raw = stdout.read(frame_size)
-            frame = np.frombuffer(frame_raw, dtype=np.uint8)
-            if frame.size == 0: break
-            yield frame.reshape((height, width, 3))
-            stdout.flush()
-        pipe.wait()
+                                stderr=STDOUT,
+                                universal_newlines=False)
+
+        stderr = ""
+        while True:
+            assert pipe.stdout is not None
+
+            line = (pipe.stdout.readline().decode(
+                "utf-8", errors="replace").strip())
+            stderr += line
+            if line == "" and pipe.poll() is not None:
+                break
+
+            if line.startswith("frame=") and line[6:].isdigit():
+                yield int(line[6:])
+
+        if pipe.returncode != 0:
+            raise RuntimeError(f"Error running command {self.cmd}: {stderr}")
 
 
 class FFMpegHWTest:
@@ -301,11 +234,25 @@ class FFMpegHWTest:
             ]
         return available_decoders
 
+    def priority_sort(self, coders: list):
+        priority = {"_cuvid": 4, "_nvenc": 4, "_qsv": 3, "_vaapi": 2}
+
+        def key(x):
+            for k, v in priority.items():
+                if k in x:
+                    return v
+            return 0
+
+        return coders.sort(key=key, reverse=True)
+
     def run(self, codec: str):
         encoders, decoders = self.get_available_codecs(codec)
+
         available_encoders = self.test_encoders(encoders)
         available_decoders = self.test_decoders(decoders,
                                                 available_encoders[0])
+        self.priority_sort(available_encoders)
+        self.priority_sort(available_decoders)
         return available_encoders, available_decoders
 
 
@@ -318,6 +265,6 @@ if __name__ == "__main__":
     logging.getLogger("rich").setLevel("DEBUG")
     import time
     t = time.time()
-    #print(FFMpegHWTest().run("hevc"))
-    print(VideoInfo(r"E:\Code\py-rotaeno-stablizer-gui\test\test_full.mp4"))
+    print(FFMpegHWTest().run("hevc"))
+    #print(VideoInfo(r"E:\Code\py-rotaeno-stablizer-gui\test\test_full.mp4"))
     print(time.time() - t)

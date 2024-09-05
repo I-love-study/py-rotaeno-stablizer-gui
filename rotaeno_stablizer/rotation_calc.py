@@ -1,12 +1,17 @@
-from collections import deque
+import logging
+import subprocess
+from os import PathLike
 from pathlib import Path
+from subprocess import PIPE
+from math import radians
 
 import numpy as np
-import logging
-
 from rich.markup import escape
 
+from .ffmpeg import get_ffmpeg
+
 log = logging.getLogger("rich")
+
 
 class RotationCalc:
     """通过画面计算旋转角度"""
@@ -25,10 +30,13 @@ class RotationCalc:
         """V1 旋转计算方法（From https://github.com/Lawrenceeeeeeee/python_rotaeno_stabilizer）"""
 
         left, right, center, sample = np.split(input_array, 4, axis=0)
-        center_dist = np.linalg.norm(np.array(center) - np.array(sample))
-        left_length = np.linalg.norm(np.array(left) - np.array(center))
+        center_dist = np.linalg.norm(
+            np.array(center) - np.array(sample))
+        left_length = np.linalg.norm(
+            np.array(left) - np.array(center))
         left_dist = np.linalg.norm(np.array(left) - np.array(sample))
-        right_dist = np.linalg.norm(np.array(right) - np.array(sample))
+        right_dist = np.linalg.norm(
+            np.array(right) - np.array(sample))
 
         dir_ = -1 if left_dist < right_dist else 1
         if left_length == 0:
@@ -54,14 +62,19 @@ class RotationCalc:
         #assert isinstance(rotation_degree, float)
         return rotation_degree
 
-    def export_ffmpeg_cmd(self, video_name: Path | str, fps: float | None = None):
-        commands = ["-i", video_name]
+    def export_ffmpeg_cmd(self,
+                          video_name: PathLike | str,
+                          fps: float | None = None,
+                          codec: str | None = None):
+        commands = []
+        if codec is not None:
+            commands += ["-c:v", codec]
+        commands += ["-i", video_name]
 
         cs = self.area
         commands.append("-filter_complex")
         commands.append(
-            f"[0:v]{f'fps={fps};' if fps is not None else ''}"
-            "split=4[top_left][top_right][bottom_left][bottom_right];"
+            "[0:v]split=4[top_left][top_right][bottom_left][bottom_right];"
         )
 
         commands[-1] += (
@@ -69,20 +82,50 @@ class RotationCalc:
             f"[top_right]crop={cs}:{cs}:iw-{cs}:0[top_right];"
             f"[bottom_left]crop={cs}:{cs}:0:ih-{cs}[bottom_left];"
             f"[bottom_right]crop={cs}:{cs}:iw-{cs}:ih-{cs}[bottom_right];"
-            "[top_left][top_right][bottom_left][bottom_right]hstack=inputs=4[rotation];"
+            "[top_left][top_right][bottom_left][bottom_right]hstack=inputs=4"
+            f"{f',fps={fps}' if fps is not None else ''}[rotation];"
         )
 
-        commands += ["-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:"]
-        log.debug("Reader Commands: [bold green]" +
-                  escape(" ".join(map(str, commands))),
-                  extra={"markup": True})
-        
+        commands += [
+            "-map", "[rotation]", "-f", "rawvideo", "-pix_fmt",
+            "rgb24", "pipe:"
+        ]
+
         return commands
 
-    def export_cmd(self, cmd_path: Path):
+    def export_cmd(self,
+                   video_name: str | PathLike,
+                   fps: float,
+                   codec: str | None = None):
+        cmd = self.export_ffmpeg_cmd(video_name, fps, codec)
+        commands = [get_ffmpeg(), "-loglevel", "error", *cmd]
         
-        ...
+        height, width = self.area * 4, self.area
+        frame_size = height * width * 3
+        pipe = subprocess.Popen(commands,
+                                stdout=PIPE,
+                                stderr=PIPE,
+                                bufsize=frame_size + 1)
+        log.debug("Running Commands: [bold green]" +
+                  escape(" ".join(map(str, commands))),
+                  extra={"markup": True})
+        stdout = pipe.stdout
+        assert stdout is not None
+        i = 0
+        while pipe.poll() is None:
+            frame_raw = stdout.read(frame_size)
+            frame = np.frombuffer(frame_raw, dtype=np.uint8)
+            if frame.size == 0: break
+            rotate = self.method(frame.reshape((height, width, 3)))
+            i_then = i + 1 / fps
+            yield f"{i}-{i_then} rotate angle {radians(rotate)};"
+            i = i_then
+            stdout.flush()
+        pipe.wait()
+
 
 if __name__ == "__main__":
     test = RotationCalc()
-    print(test.export_ffmpeg_cmd("test.mp4"))
+    for line in test.export_cmd(
+            r"E:\Code\py-rotaeno-stablizer-gui\test\test_5s.mp4", 60):
+        print(line)
