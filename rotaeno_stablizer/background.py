@@ -125,7 +125,9 @@ class PaintMsg:
         video_resize = ceil_even(video_resize)
         video_crop = ceil_even(video_crop)
         output_size = ceil_even(output_size)
-        image_info = skia.ImageInfo.Make(*video_crop, skia.ColorType.kGray_8_ColorType, skia.AlphaType.kOpaque_AlphaType)
+        image_info = skia.ImageInfo.Make(
+            *video_crop, skia.ColorType.kGray_8_ColorType,
+            skia.AlphaType.kOpaque_AlphaType)
         surface = skia.Surface.MakeRaster(image_info)
         #surface = skia.Surface(*video_crop)
         with surface as canvas:

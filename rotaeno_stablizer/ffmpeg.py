@@ -5,16 +5,12 @@ import re
 import subprocess
 import uuid
 from contextlib import contextmanager
-from functools import cached_property
+from dataclasses import InitVar, dataclass, field
 from multiprocessing.pool import ThreadPool
 from os import PathLike
 from pathlib import Path
-from queue import Queue
 from shutil import which
 from subprocess import PIPE, STDOUT
-from rich.markup import escape
-from dataclasses import InitVar, dataclass, field
-import numpy as np
 
 log = logging.getLogger("rich")
 
@@ -128,8 +124,9 @@ class FFMpegProgress:
         self.cmd = cmd
 
     def process(self):
-        commands = self.cmd[0:1] + ["-progress", "-", "-nostats", "-stats_period", "0.1"
-                                    ] + self.cmd[1:]
+        commands = self.cmd[0:1] + [
+            "-progress", "-", "-nostats", "-stats_period", "0.1"
+        ] + self.cmd[1:]
         pipe = subprocess.Popen(commands,
                                 stdin=PIPE,
                                 stdout=PIPE,
@@ -150,7 +147,8 @@ class FFMpegProgress:
                 yield int(line[6:])
 
         if pipe.returncode != 0:
-            raise RuntimeError(f"Error running command {self.cmd}: {stderr}")
+            raise RuntimeError(
+                f"Error running command {self.cmd}: {stderr}")
 
 
 class FFMpegHWTest:

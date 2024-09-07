@@ -1,9 +1,9 @@
 import logging
 import subprocess
+from math import radians
 from os import PathLike
 from pathlib import Path
 from subprocess import PIPE
-from math import radians
 
 import numpy as np
 from rich.markup import escape
@@ -83,8 +83,7 @@ class RotationCalc:
             f"[bottom_left]crop={cs}:{cs}:0:ih-{cs}[bottom_left];"
             f"[bottom_right]crop={cs}:{cs}:iw-{cs}:ih-{cs}[bottom_right];"
             "[top_left][top_right][bottom_left][bottom_right]hstack=inputs=4"
-            f"{f',fps={fps}' if fps is not None else ''}[rotation];"
-        )
+            f"{f',fps={fps}' if fps is not None else ''}[rotation];")
 
         commands += [
             "-map", "[rotation]", "-f", "rawvideo", "-pix_fmt",
@@ -99,7 +98,7 @@ class RotationCalc:
                    codec: str | None = None):
         cmd = self.export_ffmpeg_cmd(video_name, fps, codec)
         commands = [get_ffmpeg(), "-loglevel", "error", *cmd]
-        
+
         height, width = self.area * 4, self.area
         frame_size = height * width * 3
         pipe = subprocess.Popen(commands,

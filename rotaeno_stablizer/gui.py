@@ -1,18 +1,18 @@
 """Still in WIP"""
 import datetime
+import tomllib
+import traceback
 from pathlib import Path
 from queue import Queue
 from threading import Thread
 from tkinter.filedialog import askopenfilename
-import traceback
-import ttkbootstrap as ttk
 
+import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from ttkbootstrap.dialogs import Messagebox
-import tomllib
 
-from .ffmpeg import FFMpegHWTest, FFMpegReader
 from . import Rotaeno
+from .ffmpeg import FFMpegHWTest, FFMpegReader
 
 
 class Gui(ttk.Frame):
@@ -354,6 +354,7 @@ class Gui(ttk.Frame):
 
 if __name__ == '__main__':
     import logging
+
     from rich.logging import RichHandler
     logging.basicConfig(level="INFO",
                         format="%(message)s",

@@ -1,11 +1,10 @@
+import sys
 from os import PathLike
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import skia
-from rich.console import Group
 from rich import print as rprint
-from rich.live import Live
 from rich.markup import escape
 from rich.progress import (
     BarColumn,
@@ -13,15 +12,19 @@ from rich.progress import (
     SpinnerColumn,
     TaskProgressColumn,
     TextColumn,
-    TimeElapsedColumn,
     TimeRemainingColumn,
 )
 
 from .background import PaintMsg
-from .ffmpeg import FFMpegHWTest, VideoInfo, get_ffmpeg, FFMpegProgress
+from .ffmpeg import FFMpegHWTest, FFMpegProgress, VideoInfo, get_ffmpeg
 from .log import log
 from .rotation_calc import RotationCalc
 from .utils import FPSColumn, ask_confirm
+
+if sys.version_info < (3, 11):
+    raise ImportError(
+        "RotaenoStablizer requires Python 3.11 or higher. "
+        f"Now you are on Python {sys.version}")
 
 
 class Rotaeno:
@@ -128,9 +131,9 @@ class Rotaeno:
             BarColumn(), TaskProgressColumn(), FPSColumn(),
             TimeRemainingColumn(elapsed_when_finished=True))
 
-        task1 = progress.add_task("[1/5] Preprocessing...", total=1)
-        task2 = progress.add_task("[2/5] Create Rotation Command")
-        task3 = progress.add_task("[3/5] Running Rotaion")
+        task1 = progress.add_task("[1/3] Preprocessing...", total=1)
+        task2 = progress.add_task("[2/3] Create Rotation Command")
+        task3 = progress.add_task("[3/3] Running Rotaion")
         with TemporaryDirectory(dir=".") as temp_dir_str, progress:
             temp_dir = Path(temp_dir_str)
             log.debug(f"Create temp dir: {temp_dir}")
@@ -212,6 +215,7 @@ class Rotaeno:
             for p in ff.process():
                 progress.update(task3, completed=p)
             progress.update(task3, completed=total_frame)
+            log.info("Task Finish")
 
 
 if __name__ == "__main__":

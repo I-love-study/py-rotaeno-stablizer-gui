@@ -18,6 +18,7 @@ class FPSColumn(ProgressColumn):
             return Text("FPS:   ?", style="progress.data.speed")
         return Text(f"FPS:{speed:>4.0f}", style="progress.data.speed")
 
+
 def get_skia_picture(
         background: str | PathLike | None) -> skia.Image | None:
     if background is None:
