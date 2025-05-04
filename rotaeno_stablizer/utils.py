@@ -1,11 +1,13 @@
 import sys
 import urllib.request
-from os import PathLike
+from os import PathLike, fspath
+import os.path
 
-import skia
+from PIL import Image
 from rich import get_console
 from rich.progress import ProgressColumn, Task
 from rich.text import Text
+
 
 
 class FPSColumn(ProgressColumn):
@@ -19,15 +21,22 @@ class FPSColumn(ProgressColumn):
         return Text(f"FPS:{speed:>4.0f}", style="progress.data.speed")
 
 
-def get_skia_picture(
-        background: str | PathLike | None) -> skia.Image | None:
+def get_picture(background: str | PathLike | None) -> Image.Image | None:
     if background is None:
         return
-    if isinstance(background, str) and background.startswith("http"):
-        with urllib.request.urlopen(background) as f:
-            r = f.read()
-        return skia.Image.MakeFromEncoded(r)
-    return skia.Image.open(background)
+
+    input_str = fspath(background)
+
+    # 判断是网址还是本地路径，并加载图片
+    if input_str.startswith(("http://", "https://")):
+        with urllib.request.urlopen(input_str) as r:
+            image = Image.open(r)
+    elif os.path.isfile(input_str):
+        image = Image.open(input_str)
+    else:
+        raise ValueError("Unknown input")
+
+    return image
 
 
 if sys.platform == "win32":

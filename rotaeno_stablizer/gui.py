@@ -1,367 +1,530 @@
-"""Still in WIP"""
-import datetime
-import tomllib
-import traceback
+import tkinter
+from functools import wraps
 from pathlib import Path
-from queue import Queue
-from threading import Thread
 from tkinter.filedialog import askopenfilename
+from typing import Callable
+from webbrowser import open as webopen
 
-import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
-from ttkbootstrap.dialogs import Messagebox
+try:
+    from CTkMessagebox import CTkMessagebox
+    from CTkTable import CTkTable
+    from CTkMenuBar import CTkMenuBar
+    from customtkinter import (
+        BooleanVar,
+        CTk,
+        CTkButton,
+        CTkCheckBox,
+        CTkEntry,
+        CTkFont,
+        CTkFrame,
+        CTkImage,
+        CTkLabel,
+        CTkProgressBar,
+        CTkScrollableFrame,
+        CTkToplevel,
+        IntVar,
+        StringVar,
+        ThemeManager,
+        set_appearance_mode,
+    )
+    from PIL import Image
+except ImportError as e:
+    raise ImportError("Cannot import customtkinter, fix it by using `pip install rotaeno_stablizer[gui]`") from e
 
 from . import Rotaeno
-from .ffmpeg import FFMpegHWTest, FFMpegReader
+from .config import config_data
+from .ffmpeg import FFMpegHWTest
+
+video_type = [("Video", ".mp4 .m4v .avi .mov .flv .mkv"), ("mp4 video", ".mp4 .m4v"),
+              ('avi', '.avi'), ("Mov video", ".mov"),
+              ('Any other that ffmpeg support', '*')]
+image_type = [("Image", ".jpg .jpeg .png .bmp .tiff .gif"), ("JPG", ".jpg .jpeg"),
+              ('PNG', '.png'), ('其他乱七八糟类型的图片', '*')]
 
 
-class Gui(ttk.Frame):
+def create_logos():
+    logo_black = Image.open(Path(__file__).parent / "rotaeno_logo_black.png")
+    logo_white = Image.new("RGBA", logo_black.size)
+    logo_white.putdata([(255, 255, 255, pixel[3]) if pixel[:3] == (0, 0, 0) else pixel
+                        for pixel in logo_black.getdata()])
+    return logo_black, logo_white
 
-    queue = Queue()
-    searching = False
+logo_black, logo_white = create_logos()
 
-    def __init__(self, master):
-        #ttk.font.nametofont("TkDefaultFont").configure(
-        #    family="Consolas", size=10)
-        ttk.font.nametofont("TkDefaultFont").configure(
-            family="Source Han Sans HC", size=10, weight=NORMAL)
+def raise_messagebox(master=None, icon="warning"):
 
-        super().__init__(master, padding=15)
-        self.config = tomllib.loads(
-            Path("config.toml").read_text(encoding="UTF-8"))
-        self.pack(fill=BOTH, expand=YES)
+    def decorator(func: Callable[..., None]):
 
-        # application variables
-        self.path_var = ttk.StringVar(value="")
-        self.out_path_var = ttk.StringVar(value="")
+        @wraps(func)
+        def wrapper(*args, **kw):
+            try:
+                func(*args, **kw)
+            except Exception as e:
+                CTkMessagebox(master,
+                              title=e.__class__.__name__,
+                              message=str(e),
+                              icon=icon)
 
-        self.video_info_var = ttk.StringVar(value="Video Info")
+        return wrapper
 
-        self.config_lf = ttk.Frame(self)
+    return decorator
 
-        self.coder_frame = ttk.Frame(self.config_lf)
-        self.coder_frame.grid(row=0, column=0)
 
-        self.args_frame = ttk.Frame(self.config_lf)
-        self.path_lf = ttk.Labelframe(self.args_frame,
-                                      text="  路径  ",
-                                      padding=15)
-        self.path_lf.pack(fill=BOTH, expand=YES)
-        self.option_lf = ttk.Labelframe(self.args_frame,
-                                        text=" 选项 ",
-                                        padding=15)
-        self.option_lf.pack(fill=BOTH, expand=YES)
+class PathFrame(CTkFrame):
+    """Path Chooser"""
 
-        self.video_info_lf = ttk.LabelFrame(self.config_lf,
-                                            text="视频信息",
-                                            padding=15)
-        ttk.Label(self.video_info_lf,
-                  textvariable=self.video_info_var,
-                  font=("Consolas", 10)).pack()
-        self.video_info_lf.grid(row=0, column=2, sticky=NSEW)
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+        inner = CTkFrame(self, fg_color="transparent")
+        inner.pack(padx=10, pady=0, fill="none", expand=True)
 
-        self.args_frame.grid(row=0, column=1, padx=10)
-        self.all_vars = {}
-        self.encoder_vars = {}
-        self.create_file_row()
-        self.create_option_row()
-        self.create_encoder()
-        self.config_lf.pack()
+        self.input_video_ = StringVar()
+        self.cover_ = StringVar()
+        self.output_video_ = StringVar()
+        self.output_mask_video_ = StringVar()
+        self.output_cmd_data_ = StringVar()
+        self.need_output_video_ = BooleanVar()
+        self.need_output_mask_video_ = BooleanVar()
+        self.need_output_cmd_data_ = BooleanVar()
+        self.force_rewrite_ = BooleanVar()
 
-        self.progressbar = ttk.Progressbar(master=self,
-                                           mode=DETERMINATE,
-                                           bootstyle=SUCCESS)
-        self.progressbar.pack(fill=X, expand=YES, pady=10)
-        self.run_button = ttk.Button(self,
-                                     text="Run",
-                                     command=self.running)
-        self.run_button.pack(side=RIGHT, pady=(10, 0))
+        def input_wrapper():
+            filepath = askopenfilename(title="请选择输入视频",
+                                       defaultextension=".mp4",
+                                       filetypes=video_type)
+            filepath = Path(filepath)
+            self.input_video_.set(str(filepath))
+            self.ctk_input._entry.xview_moveto(1)
+            self.output_video_.set(str(filepath.with_stem(filepath.stem + "_out")))
+            self.ctk_output._entry.xview_moveto(1)
+            self.output_mask_video_.set(
+                str(filepath.with_stem(filepath.stem.removesuffix("_out") + "_mask")))
+            self.ctk_mask._entry.xview_moveto(1)
+            self.output_cmd_data_.set(
+                str(
+                    filepath.with_stem(filepath.stem.removesuffix("_out") +
+                                       "_rotate").with_suffix(".cmd")))
+            self.ctk_data._entry.xview_moveto(1)
 
-    def create_file_row(self):
-        """Add path row to labelframe"""
-        path_row = ttk.Frame(self.path_lf)
-        path_row.pack(fill=X, expand=YES)
-        path_lbl = ttk.Label(path_row, text="Input Video", width=11)
-        path_lbl.pack(side=LEFT, padx=(15, 0))
-        path_ent = ttk.Entry(path_row, textvariable=self.path_var)
-        path_ent.pack(side=LEFT, fill=X, expand=YES, padx=5)
-        browse_btn = ttk.Button(master=path_row,
-                                text="Browse",
-                                command=self.on_browse_video,
-                                width=8)
-        browse_btn.pack(side=LEFT, padx=5)
+        def cover_wrapper():
+            filepath = askopenfilename(title="请选择输入图像",
+                                       defaultextension=".jpg",
+                                       filetypes=image_type)
+            self.cover_.set(filepath)
 
-        path_row = ttk.Frame(self.path_lf)
-        path_row.pack(fill=X, expand=YES, pady=15)
-        path_lbl = ttk.Label(path_row, text="Output Video", width=11)
-        path_lbl.pack(side=LEFT, padx=(15, 0))
-        path_ent = ttk.Entry(path_row, textvariable=self.out_path_var)
-        path_ent.pack(side=LEFT, fill=X, expand=YES, padx=5)
-        browse_btn = ttk.Button(master=path_row,
-                                text="Browse",
-                                command=self.on_browse_out_video,
-                                width=8)
-        browse_btn.pack(side=LEFT, padx=5)
+        def output_wrapper():
+            p = Path(self.output_mask_video_.get())
+            filepath = askopenfilename(title="请选择输出掩码视频",
+                                       defaultextension=".mp4",
+                                       initialdir=p.parent,
+                                       initialfile=p.name,
+                                       filetypes=video_type)
+            self.output_video_.set(filepath)
 
-        path_row = ttk.Frame(self.path_lf)
-        path_row.pack(fill=X, expand=YES)
-        path_lbl = ttk.Label(path_row, text="Background", width=11)
-        path_lbl.pack(side=LEFT, padx=(15, 0))
-        self.all_vars["background"] = ttk.StringVar()
-        path_ent = ttk.Entry(path_row,
-                             textvariable=self.all_vars["background"])
-        path_ent.pack(side=LEFT, fill=X, expand=YES, padx=5)
-        browse_btn = ttk.Button(master=path_row,
-                                text="Browse",
-                                command=self.on_browse_image,
-                                width=8)
-        browse_btn.pack(side=LEFT, padx=5)
+        def output_mask_wrapper():
+            p = Path(self.output_video)
+            filepath = askopenfilename(title="请选择输出视频",
+                                       defaultextension=".mp4",
+                                       initialdir=p.parent,
+                                       initialfile=p.name,
+                                       filetypes=video_type)
+            filepath = Path(filepath)
+            self.output_video_.set(str(filepath))
 
-    def create_option_row(self):
-        entry_frame = ttk.Frame(self.option_lf)
-        path_lbl = ttk.Label(entry_frame, text="Output Video Height")
-        path_lbl.grid(row=0, column=0)
-        self.all_vars["height"] = ttk.IntVar(
-            value=self.config["video"]["height"])
-        path_ent = ttk.Entry(entry_frame,
-                             textvariable=self.all_vars["height"],
-                             width=8)
-        path_ent.grid(row=0, column=1, padx=5)
+        def output_cmd_wrapper():
+            p = Path(self.output_video)
+            filepath = askopenfilename(title="请选择输出 Rotaeno 数据",
+                                       defaultextension=".cmd",
+                                       initialdir=p.parent,
+                                       initialfile=p.name,
+                                       filetypes=[("FFmpeg Cmd Output", "*")])
+            filepath = Path(filepath)
+            self.output_cmd_data_.set(str(filepath))
 
-        op3 = ttk.Label(entry_frame, text='Window Size')
-        op3.grid(row=1, column=0)
-        self.all_vars["window_size"] = ttk.IntVar(
-            value=self.config["video"]["window_size"])
-        op3 = ttk.Entry(entry_frame,
-                        textvariable=self.all_vars["window_size"],
-                        width=8)
-        op3.grid(row=1, column=1, pady=10)
+        inner.grid_columnconfigure(list(range(3)), pad=15)
+        inner.grid_rowconfigure(list(range(6)), pad=15)
+        inner.grid_rowconfigure(6, pad=0)
 
-        op3 = ttk.Label(entry_frame, text='Rotate Version')
-        op3.grid(row=2, column=0)
-        self.all_vars["rotation_version"] = ttk.IntVar(
-            value=self.config["video"]["rotation_version"])
-        op3 = ttk.Entry(
-            entry_frame,
-            textvariable=self.all_vars["rotation_version"],
-            width=8)
-        op3.grid(row=2, column=1)
+        CTkLabel(inner, text="Input Video").grid(row=0, column=1, sticky="W")
+        self.ctk_input = CTkEntry(inner, width=200, textvariable=self.input_video_)
+        self.ctk_input.grid(row=0, column=2)
+        CTkButton(inner, width=50, text="Select", command=input_wrapper).grid(row=0,
+                                                                              column=3)
 
-        check_frame = ttk.Frame(self.option_lf)
-        bool_var = ["auto_crop", "circle_crop", "display_all"]
-        for i, name in enumerate(bool_var):
-            var = ttk.BooleanVar(value=self.config["video"][name])
-            button = ttk.Checkbutton(check_frame,
-                                     text=name,
-                                     state=ACTIVE,
-                                     variable=var)
-            self.all_vars[name] = var
-            button.grid(row=i, column=2, pady=10, sticky=W)
+        CTkLabel(inner, text="Cover").grid(row=1, column=1, sticky="W")
+        CTkEntry(inner, width=200, textvariable=self.cover_).grid(row=1, column=2)
+        CTkButton(inner, width=50, text="Select", command=cover_wrapper).grid(row=1,
+                                                                              column=3)
 
-        entry_frame.pack(fill=X,
-                         expand=YES,
-                         pady=15,
-                         padx=(0, 10),
-                         side=LEFT)
-        check_frame.pack(fill=X, expand=YES, pady=15)
 
-    def create_encoder(self):
-        self.encoder_lf = ttk.LabelFrame(self.coder_frame,
-                                         text="Encoder Info",
-                                         padding=15)
-        self.encoder_lf.pack(fill=X, expand=YES)
+        p = CTkProgressBar(master=inner, height=5, width=350)
+        p.set(1)
+        p.grid(row=2, column=0, columnspan=4)
 
-        type_row = ttk.Frame(self.encoder_lf)
-        type_row.pack(fill=X, expand=YES)
-        ttk.Label(type_row, text='Encoder', width=8).pack(side=LEFT,
-                                                          pady=5,
-                                                          padx=5,
-                                                          anchor="w")
-        self.encoder_vars["codec"] = ttk.StringVar(
-            value=self.config["encode"]["codec"])
-        ttk.Entry(type_row,
-                  textvariable=self.encoder_vars["codec"],
-                  width=10).pack(side=LEFT, pady=5, anchor="w")
+        CTkCheckBox(inner, text="Output Video",
+                    variable=self.need_output_video_).grid(row=3, column=1, sticky="W")
+        self.ctk_output = CTkEntry(inner, width=200, textvariable=self.output_video_)
+        self.ctk_output.grid(row=3, column=2)
+        CTkButton(inner, width=50, text="Select", command=output_wrapper).grid(row=3,
+                                                                               column=3)
 
-        type_row = ttk.Frame(self.encoder_lf)
-        type_row.pack(fill=X, expand=YES)
-        ttk.Label(type_row, text='Bitrate', width=8).pack(side=LEFT,
-                                                          pady=5,
-                                                          padx=5,
-                                                          anchor="w")
-        self.encoder_vars["bitrate"] = ttk.StringVar(
-            value=self.config["encode"]["bitrate"])
-        ttk.Entry(type_row,
-                  textvariable=self.encoder_vars["bitrate"],
-                  width=10).pack(side=LEFT, pady=5, anchor="w")
+        CTkCheckBox(inner, text="Mask Video",
+                    variable=self.need_output_mask_video_).grid(row=4,
+                                                                column=1,
+                                                                sticky="W")
+        self.ctk_mask = CTkEntry(inner, width=200, textvariable=self.output_mask_video_)
+        self.ctk_mask.grid(row=4, column=2)
+        CTkButton(inner, width=50, text="Select",
+                  command=output_mask_wrapper).grid(row=4, column=3)
 
-        type_row = ttk.Frame(self.encoder_lf)
-        type_row.pack(fill=X, expand=YES)
-        ttk.Label(type_row, text='FPS', width=8).pack(side=LEFT,
-                                                      pady=5,
-                                                      padx=5,
-                                                      anchor="w")
-        self.encoder_vars["fps"] = ttk.DoubleVar(value=0)
-        ttk.Entry(type_row,
-                  textvariable=self.encoder_vars["fps"],
-                  width=10).pack(side=LEFT, pady=5, anchor="w")
+        CTkCheckBox(inner, text="Rotated Data",
+                    variable=self.need_output_cmd_data_).grid(row=5,
+                                                              column=1,
+                                                              sticky="W")
+        self.ctk_data = CTkEntry(inner, width=200, textvariable=self.output_cmd_data_)
+        self.ctk_data.grid(row=5, column=2)
+        CTkButton(inner, width=50, text="Select",
+                  command=output_cmd_wrapper).grid(row=5, column=3)
 
-        self.coder_check_lf = ttk.LabelFrame(self.coder_frame,
-                                             text="Codec check",
-                                             padding=15)
-        self.codec_entry = ttk.Entry(self.coder_check_lf, width=10)
-        self.codec_entry.grid(row=0, column=0)
-        self.codec_button = ttk.Button(self.coder_check_lf,
-                                       text="Check",
-                                       command=self.get_codec_config)
-        self.codec_button.grid(row=0, column=1)
-        self.codec_list = ttk.Treeview(self.coder_check_lf,
-                                       height=4,
-                                       show='headings')
-        self.codec_list.configure(columns=("Type", "Codec_name"))
-        self.codec_list.heading("Type", text="Type")
-        self.codec_list.heading("Codec_name", text="Codec Name")
-        self.codec_list.column('Type', width=90, anchor=CENTER)
-        self.codec_list.column('Codec_name', width=150, anchor=CENTER)
-        self.codec_list.grid(row=1,
-                             column=0,
-                             columnspan=2,
-                             pady=(10, 0))
-        self.coder_check_lf.pack(fill=X, expand=YES)
+        down_inner = CTkFrame(self, fg_color="transparent")
+        down_inner.pack(padx=10, pady=10, fill="x", expand=True)
+        self.start_button = CTkButton(down_inner, text="Start")
+        self.start_button.pack(side="right")
+        CTkCheckBox(down_inner, text="Force rewrite", variable=self.force_rewrite_).pack(side="left")
 
-    def get_codec_config(self):
-        codec = self.codec_entry.get()
-        if codec == "":
-            Messagebox.show_warning("codec 输入为空")
+
+    @property
+    def input_video(self):
+        return self.input_video_.get()
+
+    @property
+    def output_video(self):
+        return self.output_video_.get()
+
+    @property
+    def need_output_video(self):
+        return self.need_output_video_.get()
+
+    @property
+    def mask_video(self):
+        return self.output_mask_video_.get()
+
+    @property
+    def need_mask_video(self):
+        return self.need_output_mask_video_.get()
+
+    @property
+    def output_cmd_data(self):
+        return self.output_cmd_data_.get()
+
+    @property
+    def need_output_cmd_data(self):
+        return self.need_output_cmd_data_.get()
+
+    @property
+    def force_rewrite(self):
+        return self.force_rewrite_.get()
+
+    @property
+    def cover(self):
+        return self.cover_.get()
+
+class CodecFrame(CTkFrame):
+    """Codec"""
+
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+
+        width = 250
+        image_title = CTkImage(light_image=logo_black,
+                               dark_image=logo_white,
+                               size=(width, width * 168 // 523))
+        image_label = CTkLabel(self, image=image_title, text="")  # display image with a CTkLabel
+        image_label.pack(padx=5, pady=5, fill="none", expand=True)
+
+        inner = CTkFrame(self, fg_color="transparent")
+        inner.pack(padx=10, pady=10, fill="none")
+
+        self.encoder_ = StringVar(value=config_data["codec"]["encoder"])
+        self.decoder_ = StringVar(value=config_data["codec"]["decoder"])
+        self.bitrate_ = StringVar(value=config_data["codec"]["bitrate"])
+        self.fps_ = StringVar()
+        self.height_ = IntVar(value=config_data["video"]["height"])
+        self.rotation_version_ = IntVar(value=config_data["video"]["rotation_version"])
+
+        inner.grid_columnconfigure(list(range(3)), pad=15)
+        inner.grid_rowconfigure(list(range(6)), pad=15)
+
+        CTkLabel(inner, text="Decoder").grid(row=0, column=0, sticky="W")
+        CTkEntry(inner, width=100, textvariable=self.encoder_).grid(row=0, column=1)
+
+        CTkLabel(inner, text="Encoder").grid(row=1, column=0, sticky="W")
+        CTkEntry(inner, width=100, textvariable=self.decoder_).grid(row=1, column=1)
+
+        CTkLabel(inner, text="Bitrate").grid(row=2, column=0, sticky="W")
+        CTkEntry(inner, width=100, textvariable=self.bitrate_).grid(row=2, column=1)
+
+        CTkLabel(inner, text="FPS").grid(row=3, column=0, sticky="W")
+        CTkEntry(inner, width=100, textvariable=self.fps_).grid(row=3, column=1)
+
+        CTkLabel(inner, text="Output video height").grid(row=4, column=0, sticky="W")
+        CTkEntry(inner, width=100, textvariable=self.height_).grid(row=4, column=1)
+
+        CTkLabel(inner, text="Rotaeno version").grid(row=5, column=0, sticky="W")
+        CTkEntry(inner, width=100, textvariable=self.rotation_version_).grid(row=5,
+                                                                             column=1)
+
+    @property
+    def encoder(self):
+        return self.encoder_.get()
+
+    @property
+    def decoder(self):
+        return self.decoder_.get()
+
+    @property
+    def bitrate(self):
+        return self.bitrate_.get()
+
+    @property
+    def fps(self):
+        return self.fps_.get()
+
+    @property
+    def height(self):
+        return self.height_.get()
+
+    @property
+    def rotation_version(self):
+        return self.rotation_version_.get()
+
+class OptionFrame(CTkFrame):
+
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+        inner = CTkFrame(self, fg_color="transparent")
+        inner.pack(padx=10, pady=10, fill="none", expand=True)
+
+        self.auto_crop_ = BooleanVar(value=config_data["video"]["auto_crop"])
+        self.circle_crop_ = BooleanVar(value=config_data["video"]["circle_crop"])
+        self.display_all_ = BooleanVar(value=config_data["video"]["display_all"])
+        self.auto_crop_ = BooleanVar(value=config_data["video"]["auto_crop"])
+
+
+        inner.grid_columnconfigure(list(range(4)), pad=15)
+
+        CTkCheckBox(inner, text="Auto crop", variable=self.auto_crop_).grid(row=0,
+                                                                            column=0)
+        CTkCheckBox(inner, text="Circle crop",
+                    variable=self.circle_crop_).grid(row=0, column=1)
+        CTkCheckBox(inner, text="Display all",
+                    variable=self.display_all_).grid(row=0, column=2)
+
+
+    @property
+    def auto_crop(self):
+        return self.auto_crop_.get()
+
+    @property
+    def circle_crop(self):
+        return self.circle_crop_.get()
+
+    @property
+    def display_all(self):
+        return self.display_all_.get()
+
+class HWTestFrame(CTkFrame):
+
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+        inner = CTkFrame(self, fg_color="transparent")
+        inner.pack(padx=5, pady=5, fill="none", expand=True)
+
+        inner.grid_columnconfigure(list(range(3)), pad=15)
+        inner.grid_rowconfigure(list(range(3)), pad=15)
+
+        self.codec = StringVar()
+        CTkLabel(inner, text="Codec").grid(row=0, column=0, sticky="W")
+        entry = CTkEntry(inner, width=100, textvariable=self.codec)
+        entry.grid(row=0, column=1)
+        entry.bind("<Return>", self.update_table)
+        CTkButton(inner, width=50, text="Select",
+                  command=self.update_table).grid(row=0, column=2)
+        table_frame = CTkScrollableFrame(inner, height=250)
+        self.table = CTkTable(table_frame,
+                              corner_radius=0,
+                              column=2,
+                              row=9,
+                              border_width=2,
+                              width=50,
+                              values=[["Codec", "Type"]])
+        self.table.pack(fill="both")
+        table_frame.grid(row=1, columnspan=3)
+
+    def update_table(self, entry_event=None) -> None:
+        codec = self.codec.get()
+        try:
+            encoders, decoders = FFMpegHWTest().run(codec)
+        except Exception as e:
+            CTkMessagebox(title="Error", message=str(e), icon="cancel")
             return
+        self.table.delete_rows(range(1, self.table.rows))
 
-        encoders, decoders = FFMpegHWTest().run(codec)
+        for i in encoders:
+            self.table.add_row([i, "Encoder"])
+        for i in decoders:
+            self.table.add_row([i, "Decoder"])
 
-        for child in self.codec_list.get_children():
-            self.codec_list.delete(child)
 
-        for encoder in encoders:
-            self.codec_list.insert("",
-                                   END,
-                                   values=("Encoder", encoder))
-        for decoder in decoders:
-            self.codec_list.insert("",
-                                   END,
-                                   values=("Decoder", decoder))
+class AboutWindow(CTkToplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("About the Project")
+        icon = tkinter.PhotoImage(file=Path(__file__).parent / "logo.png")
+        self.wm_iconbitmap()
+        self.iconphoto(True, icon)
 
-    def on_browse_video(self):
-        """Callback for directory browse"""
-        filepath = askopenfilename(
-            title="请选择输入视频",
-            defaultextension=".mp4",
-            filetypes=[("Video", ".mp4 .m4v .avi .mov .flv .mkv"),
-                       ("mp4 video", ".mp4 .m4v"), ('avi', '.avi'),
-                       ("Mov video", ".mov"),
-                       ('Any other that ffmpeg support', '*')])
-        if not filepath:
-            return
-        filepath = Path(filepath)
-        self.path_var.set(str(filepath))
-        self.out_path_var.set(
-            str(filepath.parent / self.config["other"]
-                ["default_output_filename"].format(filepath.stem)) +
-            ".mp4")
-        self.reader = FFMpegReader(filepath)
-        key_len = max(map(len, self.reader.info))
-        self.video_info_var.set(
-            "\n".join(f"{k:{key_len}}:" +
-                      str(round(v, 4) if isinstance(v, float) else v)
-                      for k, v in self.reader.info.items()))
+        self.geometry("550x240")
+        self.resizable(False, False)
+        self.grab_set()
 
-    def on_browse_out_video(self):
-        """Callback for directory browse"""
-        p = Path(self.out_path_var.get())
-        filepath = askopenfilename(
-            title="请选择输入视频",
-            defaultextension=".mp4",
-            initialdir=p.parent,
-            initialfile=p.name,
-            filetypes=[("Video", ".mp4 .m4v .avi .mov .flv .mkv"),
-                       ("mp4 video", ".mp4 .m4v"), ('avi', '.avi'),
-                       ("Mov video", ".mov"),
-                       ('Any other that ffmpeg support', '*')])
-        if not filepath:
-            return
-        filepath = Path(filepath)
-        self.out_path_var.set(str(filepath))
+        top_frame = CTkFrame(self, fg_color="transparent")
+        top_frame.pack(padx=20, pady=(20, 10), fill="x")
 
-    def on_browse_image(self):
-        """Callback for directory browse"""
-        filepath = askopenfilename(
-            title="请选择输入图片",
-            defaultextension=".jpg",
-            filetypes=[("图片", ".jpg .jpeg .png .bmp .tiff .gif"),
-                       ("JPG图片", ".jpg .jpeg"), ('PNG图片', '.png'),
-                       ('其他乱七八糟类型的图片', '*')])
-        if filepath:
-            self.all_vars["background"].set(filepath)
+        icon_img = CTkImage(Image.open(Path(__file__).parent / "logo.png"), size=(64, 64))
+        icon_label = CTkLabel(top_frame, image=icon_img, text="")
+        icon_label.grid(row=0, column=0, padx=(0, 20), sticky="w")
 
-    def running(self):
-        arg_dict = {
-            key: value.get()
-            for key, value in self.all_vars.items()
-        }
-        if arg_dict["background"] == "":
-            arg_dict["background"] = None
-        rotaeno = Rotaeno(**arg_dict)
-        encoder_arg = {
-            key: value.get()
-            for key, value in self.encoder_vars.items()
-        }
+        right_frame = CTkFrame(top_frame, fg_color="transparent")
+        right_frame.grid(row=0, column=1, sticky="w")
 
-        import threading
-        exception_args = None
+        logo_img = CTkImage(light_image=logo_black,
+                            dark_image=logo_white,
+                            size=(120, 40))
+        logo_label = CTkLabel(right_frame, image=logo_img, text="")
+        logo_label.grid(row=0, column=0, padx=(0, 10))
 
-        event = threading.Event()
+        title_label = CTkLabel(right_frame, text="Stablizer", font=CTkFont(size=30, weight="bold"))
+        title_label.grid(row=0, column=1, sticky="w")
 
-        def check_event():
-            if not event.is_set():
-                self.master.after(100, check_event)
+        info_frame = CTkFrame(self, fg_color="transparent")
+        info_frame.pack(padx=20, pady=5, anchor="w")
+
+        CTkLabel(info_frame, text="作者：ILStudy").pack(anchor="w", pady=2)
+        site = CTkLabel(info_frame, text="项目地址：https://github.com/I-love-study/py-rotaeno-stablizer-gui")
+        assert site is not None
+        site._label.bind("<Button-1>", lambda event: webopen("https://github.com/I-love-study/py-rotaeno-stablizer-gui"))
+        site._label.bind("<Enter>", lambda event: site.configure(font=CTkFont(underline=True), cursor="hand2"))
+        site._label.bind("<Leave>", lambda event: site.configure(font=CTkFont(underline=False), cursor="arrow"))
+        site.pack(anchor="w", pady=2)
+
+        CTkButton(self, text="关闭", command=self.destroy).pack(pady=(10, 20))
+
+class App(CTk):
+
+    def __init__(self):
+        super().__init__()
+        ThemeManager.theme["CTkFont"] = CTkFont("SIMHEI", 15)
+
+        # Title & Icon
+        self.title("Rotaeno Stablizer")
+        icon = tkinter.PhotoImage(file=Path(__file__).parent / "logo.png")
+        self.wm_iconbitmap()
+        self.iconphoto(True, icon)
+
+        self.start_run = False
+
+        menu = CTkMenuBar(master=self, bg_color="transparent")
+        menu.add_cascade("About project", self.show_about_us)
+        menu.grid(columnspan=3, sticky="we")
+
+        # Build frame
+        self.codec_frame = CodecFrame(self, border_width=2)
+        self.hw_frame = HWTestFrame(self, border_width=2)
+        self.path_frame = PathFrame(self, border_width=2)
+        self.option_frame = OptionFrame(self, border_width=2)
+        self.start_button = self.path_frame.start_button
+        self.start_button.configure(command=self.start)
+        self.build()
+
+    def build(self):
+        self.codec_frame.grid(row=1, column=0, rowspan=2, padx=5, pady=5, sticky="nsew")
+        self.path_frame.grid(row=1, column=1, padx=5, pady=5, sticky="nsew")
+        self.hw_frame.grid(row=1, column=2, rowspan=2, padx=5, pady=5, sticky="nsew")
+        self.option_frame.grid(row=2, column=1, padx=5, pady=5, sticky="nsew")
+
+    def show_about_us(self):
+        AboutWindow(self)
+
+    @raise_messagebox()
+    def start(self):
+        out_path = Path(self.path_frame.output_video)
+        if out_path.exists() and not self.path_frame.force_rewrite:
+            msg = CTkMessagebox(title="输出路径已存在\n是否覆盖",
+                                icon="question",
+                                option_1="Yes",
+                                option_2="False")
+            if msg.get() == "False":
                 return
-            if exception_args is not None:
-                err = traceback.format_exception(
-                    exception_args.exc_type,
-                    exception_args.exc_value,
-                    exception_args.exc_traceback,
-                    limit=2)
-                Messagebox.show_error(
-                    "".join(err),
-                    (f"{exception_args.exc_type.__name__}: "
-                     f"{exception_args.exc_value}"))
-            else:
-                Messagebox.show_info("Process Success")
-            exit()
+        self.start_run = True
+        self.destroy()
 
-        def run_stablizer():
-            nonlocal exception_args
-            r = rotaeno.run_gui(self.reader,
-                                self.out_path_var.get(),
-                                **encoder_arg,
-                                progressbar=self.progressbar)
-            if not r[0]:
-                exception_args = r[1]
-            event.set()
+def main():
+    app = App()
+    ThemeManager.theme["CTkFont"] = CTkFont("Sarasa UI SC", 15)
+    result = CTkMessagebox(None,
+                           title="注意",
+                           message="这并不是官方制作的视频稳定器。如有问题，请及时反馈。",
+                           icon="warning",
+                           option_1="不是？我不用了！",
+                           option_2="我已知晓").get()
+    if result == "我已知晓":
+        app.mainloop()
+    else:
+        app.destroy()
 
-        thread = threading.Thread(target=run_stablizer, daemon=True)
-        thread.start()
-        self.master.after(100, check_event)
+    if not app.start_run:
+        exit()
 
+    circle_crop = app.option_frame.circle_crop
+    auto_crop = app.option_frame.auto_crop
+    display_all = app.option_frame.display_all
 
-if __name__ == '__main__':
+    rotation_version = app.codec_frame.rotation_version
+    height = app.codec_frame.height
+    encoder = app.codec_frame.encoder
+    decoder = app.codec_frame.decoder
+    bitrate = app.codec_frame.bitrate
+
+    background = app.path_frame.cover
+    input_video = app.path_frame.input_video
+    need_output_video = app.path_frame.need_output_video
+    need_output_mask = app.path_frame.need_mask_video
+    need_output_cmd_data = app.path_frame.need_output_cmd_data
+    output_video = app.path_frame.output_video if need_output_video else None
+    output_mask = app.path_frame.mask_video if need_output_mask else None
+    output_cmd = app.path_frame.output_cmd_data if need_output_cmd_data else None
     import logging
-
-    from rich.logging import RichHandler
-    logging.basicConfig(level="INFO",
-                        format="%(message)s",
-                        datefmt="[%X]",
-                        handlers=[RichHandler(rich_tracebacks=True)])
     logging.getLogger("rich").setLevel("DEBUG")
-    p = Path(__file__).parent / "logo.png"
-    app = ttk.Window("Rotaeno Stablizer", "darkly", p)
-    Gui(app)
-    app.mainloop()
+    rotaeno = Rotaeno(rotation_version=rotation_version,
+                      circle_crop=circle_crop,
+                      auto_crop=auto_crop,
+                      display_all=display_all,
+                      background=background if background else None,
+                      height=height)
+
+    input_video = Path(input_video)
+    rotaeno.run(input_video=input_video,
+                output_video=input_video.with_stem(input_video.stem + "_out")
+                if output_video is None else output_video,
+                encoder=encoder if encoder else None,
+                decoder=decoder if decoder else None,
+                bitrate=bitrate if decoder else None,
+                ensure_rewrite=True,
+                output_mask=output_mask,
+                output_cmd=output_cmd,
+            )
+
+
+if __name__ == "__main__":
+    main()

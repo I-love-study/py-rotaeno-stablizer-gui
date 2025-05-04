@@ -2,13 +2,14 @@ import math
 from dataclasses import dataclass, field
 from os import PathLike
 
-import skia
+from PIL import Image, ImageDraw, ImageEnhance
 
-from .utils import get_skia_picture
+from .utils import get_picture
 
 
 def ceil_even(num: tuple[float, float]) -> tuple[int, int]:
-    ceil_single = lambda n: math.ceil(n / 2) * 2
+    def ceil_single(n):
+        return math.ceil(n / 2) * 2
     return (ceil_single(num[0]), ceil_single(num[1]))
 
 
@@ -20,9 +21,9 @@ class PaintMsg:
     circle_radius: float
     circle_thickness: float
     resize_ratio: float
-    cover: skia.Image | None
-    background: skia.Image = field(init=False)
-    image_alpha: skia.Image
+    cover: Image.Image | None
+    background: Image.Image = field(init=False)
+    image_alpha: Image.Image
 
     def __post_init__(self):
         self.background = self.generate_background()
@@ -33,39 +34,25 @@ class PaintMsg:
         thickness = self.circle_thickness
 
         brightness = 0.2
-        surface = skia.Surface(width, height)
-        with surface as canvas:
-            canvas.clear(skia.ColorBLACK)
-            if self.cover is not None:
-                # 调整背景图像大小
-                cover_resized = self.cover.resize(
-                    int(r * 2), int(r * 2))
 
-                # 创建亮度过滤器
-                brightness_filter = skia.ColorFilters.Matrix([
-                    brightness, 0, 0, 0, 0, 0, brightness, 0, 0, 0, 0,
-                    0, brightness, 0, 0, 0, 0, 0, 1, 0
-                ])
-                paint = skia.Paint(ColorFilter=brightness_filter)
+        image = Image.new("RGB", (width, height))
+        convert_x = int((width - r * 2) / 2)
+        convert_y = int((height - r * 2) / 2)
+        if self.cover is not None:
+            cover_resized = self.cover.resize((int(r * 2), int(r * 2)))
+            cover_resized = ImageEnhance.Brightness(cover_resized).enhance(brightness)
+            image.paste(cover_resized, (convert_x, convert_y))
 
-                # 将背景图像居中
-                canvas.save()
-                canvas.translate((width - r * 2) / 2,
-                                 (height - r * 2) / 2)
-
-                # 绘制调整后的背景图像
-                canvas.drawImage(cover_resized, 0, 0, paint=paint)
-                canvas.restore()
-
-            # 绘制圆
-            paint = skia.Paint(Color=skia.ColorWHITE,
-                               Style=skia.Paint.kStroke_Style,
-                               StrokeWidth=thickness,
-                               AntiAlias=True)
-            canvas.drawCircle(width // 2, height // 2, r, paint)
+        circle_image = Image.new("RGBA", (width * 2, height * 2))
+        ImageDraw.Draw(circle_image).circle((width, height),
+                                            r * 2,
+                                            outline="white",
+                                            width=int(thickness * 2))
+        circle_image = circle_image.resize((width, height))
+        image.paste(circle_image, mask=circle_image)
 
         # 返回绘制结果
-        return surface.makeImageSnapshot()
+        return image
 
     @classmethod
     def from_video_info(cls,
@@ -77,8 +64,6 @@ class PaintMsg:
                         auto_crop: bool = True,
                         display_all: bool = True):
         aspect_ratio = 16 / 9
-
-        # ciricle radius is from https://github.com/Lawrenceeeeeeee/python_rotaeno_stabilizer
 
         if auto_crop:
             video_ratio = width / height
@@ -103,15 +88,14 @@ class PaintMsg:
                               video_crop[1] / resize_ratio)
             else:
                 resize_ratio = video_crop[1] / output_height_want
-                video_crop = (width / resize_ratio,
-                              output_height_want)
-            video_resize = (width / resize_ratio,
-                            height / resize_ratio)
+                video_crop = (width / resize_ratio, output_height_want)
+            video_resize = (width / resize_ratio, height / resize_ratio)
         else:
             resize_ratio = 1
             video_resize = (width, height)
 
-        circle_radius = (1.5575 * video_crop[1]) // 2
+        # ciricle radius is from https://github.com/Lawrenceeeeeeee/python_rotaeno_stabilizer
+        circle_radius = (1.565 * video_crop[1]) // 2
         circle_thickness = max(video_crop[1] // 120, 1)
 
         if display_all:
@@ -119,32 +103,16 @@ class PaintMsg:
         elif circle_crop:
             output_size = video_crop
         else:
-            output_size = (math.sqrt(video_crop[0]**2 +
-                                     video_crop[1]**2), video_crop[1])
+            output_size = (math.sqrt(video_crop[0]**2 + video_crop[1]**2),
+                           video_crop[1])
 
         video_resize = ceil_even(video_resize)
         video_crop = ceil_even(video_crop)
         output_size = ceil_even(output_size)
-        image_info = skia.ImageInfo.Make(
-            *video_crop, skia.ColorType.kGray_8_ColorType,
-            skia.AlphaType.kOpaque_AlphaType)
-        surface = skia.Surface.MakeRaster(image_info)
-        #surface = skia.Surface(*video_crop)
-        with surface as canvas:
-            if circle_crop:  # 创建绘制圆形的 Paint 对象
-                paint = skia.Paint(
-                    Color=skia.ColorWHITE,  # 圆形的颜色
-                    Style=skia.Paint.kFill_Style,  # 填充圆形
-                    AntiAlias=True)
 
-                x, y = video_crop
-                x //= 2
-                y //= 2
-                # 绘制圆形
-                canvas.drawCircle(x, y, x, paint)
-                #print("2", time.time() - t)
-            else:
-                canvas.clear(skia.ColorWHITE)
+        alpha_image = Image.new("L", (video_crop[0] * 2, video_crop[1] * 2))
+        ImageDraw.Draw(alpha_image).circle(video_crop, video_crop[0], "white")
+        alpha_image = alpha_image.resize(video_crop)
 
         return cls(video_resize=video_resize,
                    video_crop=video_crop,
@@ -152,15 +120,13 @@ class PaintMsg:
                    circle_radius=circle_radius,
                    circle_thickness=circle_thickness,
                    resize_ratio=resize_ratio,
-                   cover=get_skia_picture(cover),
-                   image_alpha=surface.makeImageSnapshot())
+                   cover=get_picture(cover),
+                   image_alpha=alpha_image)
 
 
 if __name__ == "__main__":
     a = PaintMsg.from_video_info(
         1920,
         1920,
-        cover=
-        r"E:\Code\py-rotaeno-stablizer-gui\test\Songs_today-is-not-tomorrow.png"
-    )
-    print(a)
+        cover=r"E:\Code\py-rotaeno-stablizer-gui\test\Songs_today-is-not-tomorrow.png")
+    a.background.save("test.jpg")

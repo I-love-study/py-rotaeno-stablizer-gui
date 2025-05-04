@@ -28,9 +28,10 @@ class RotationCalc:
         right = input_data[3:6]
         center = input_data[6:9]
         sample = input_data[9:12]
-        calculate_distance = lambda point1, point2: ((point2[0] - point1[0])**2 +
-                                                     (point2[1] - point1[1])**2 +
-                                                     (point2[2] - point1[2])**2)**0.5
+
+        def calculate_distance(point1, point2):
+            return ((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2 +
+                    (point2[2] - point1[2])**2)**0.5
 
         center_dist = calculate_distance(center, sample)
         left_length = calculate_distance(left, center)
@@ -41,7 +42,7 @@ class RotationCalc:
         if left_length == 0:
             angle = 180.0
         else:
-            angle = float((center_dist - left_length) / left_length * 180 * dir_ + 180)
+            angle = (center_dist - left_length) / left_length * 180 * dir_ + 180
 
         return -angle
 
@@ -56,7 +57,6 @@ class RotationCalc:
             mul_num *= 2
         rotation_degree = color_to_degree / 4096 * 360
 
-        #assert isinstance(rotation_degree, float)
         return rotation_degree
 
     def export_ffmpeg_cmd(self,

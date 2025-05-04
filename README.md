@@ -2,19 +2,21 @@
 
 Rotaeno 录屏稳定器
 
-> [!WARNING]
-> 该分支代码还处于不可用状态，请勿下载该分支代码
-
 ![Support Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FI-love-study%2Fpy-rotaeno-stablizer-gui%2Fmain%2Fpyproject.toml)
 
 ## 特点
 
-1. 使用 ffmpeg 作为视频编解码器，可以选择多个编码器选择（包括显卡编码）
-2. 使用 PIPE 作连接，尽量减少中间文件的存储
-3. 能尽量使用多核性能
-4. 采用平滑曲线，让输出更加稳定
+1. 使用 ffmpeg 作为视频编解码器，可以选择多个编码器选择（包括显卡编解码）
+2. 通过直接将旋转角度传递给 ffmpeg ，提升因 PIPE 传输而造成的短板效应
+3. 可直接输出掩码的选项，使用户可以直接通过
 
 ## 界面
+
+浅色：
+
+![interface](docs_image/interface_white.png)
+
+暗色：
 
 ![interface](docs_image/interface.png)
 
@@ -45,18 +47,6 @@ Codec check:
 |  不进行自动裁切  |     --no-auto-crop      |   <details>![no_auto_crop](docs_image/no_auto_crop.avif)</details>    |
 |  不进行圆形裁切  |    --no-circle-crop     | <details>![no_circle_crop](docs_image/no_circle_crop.avif)</details>  |
 | 不输出正方形版本 |    --no-display-all     | <details>![no_display_all](docs_image/no_display_all.avif)</details>  |
-
-## TO-DO-LIST
-
-- [x] 帧处理
-- [x] SMA 平滑曲线
-- [x] 视频处理
-- [ ] 编解码器详细设置
-- [x] 配置文件
-- [x] ~~多线程处理~~ `cv2.warpAffine` 已是多线程
-- [ ] 环状频谱图（低优先级）
-- [x] 命令行调用
-- [x] GUI~~（或 TUI）~~界面
 
 ## 安装
 
@@ -102,6 +92,7 @@ python -m rotaeno_stablizer [options] input_video.mp4
 
 或者直接双击或 `python -m rotaeno_stablizer`，将会得到以下文字
 
+<!--虽然颜色不能在 Github 上被看到，但是万一呢-->
 <pre style="font-family:Menlo,'DejaVu Sans Mono',consolas,sans-serif, monospace; background-color:#171b22">
 <code style="font-family:inherit; background-color:#171b22">请输入原始文件:
 输出文件： <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">test_out.mp4</span>
