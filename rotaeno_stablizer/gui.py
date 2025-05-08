@@ -1,14 +1,16 @@
-import tkinter
 from functools import wraps
+from importlib import resources
 from pathlib import Path
 from tkinter.filedialog import askopenfilename
 from typing import Callable
 from webbrowser import open as webopen
 
+from PIL import Image
+
 try:
+    from CTkMenuBar import CTkMenuBar
     from CTkMessagebox import CTkMessagebox
     from CTkTable import CTkTable
-    from CTkMenuBar import CTkMenuBar
     from customtkinter import (
         BooleanVar,
         CTk,
@@ -25,9 +27,8 @@ try:
         IntVar,
         StringVar,
         ThemeManager,
-        set_appearance_mode,
     )
-    from PIL import Image
+    from PIL import ImageTk
 except ImportError as e:
     raise ImportError("Cannot import customtkinter, fix it by using `pip install rotaeno_stablizer[gui]`") from e
 
@@ -43,7 +44,8 @@ image_type = [("Image", ".jpg .jpeg .png .bmp .tiff .gif"), ("JPG", ".jpg .jpeg"
 
 
 def create_logos():
-    logo_black = Image.open(Path(__file__).parent / "rotaeno_logo_black.png")
+    with resources.files("rotaeno_stablizer").joinpath("rotaeno_logo_black.png").open("rb") as f:
+        logo_black = Image.open(f).copy()
     logo_white = Image.new("RGBA", logo_black.size)
     logo_white.putdata([(255, 255, 255, pixel[3]) if pixel[:3] == (0, 0, 0) else pixel
                         for pixel in logo_black.getdata()])
@@ -380,7 +382,9 @@ class AboutWindow(CTkToplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("About the Project")
-        icon = tkinter.PhotoImage(file=Path(__file__).parent / "logo.png")
+        with resources.files("rotaeno_stablizer").joinpath("logo.png").open("rb") as f:
+            logo_image = Image.open(f).copy()
+            icon = ImageTk.PhotoImage(logo_image)
         self.wm_iconbitmap()
         self.iconphoto(True, icon)
 
@@ -391,7 +395,7 @@ class AboutWindow(CTkToplevel):
         top_frame = CTkFrame(self, fg_color="transparent")
         top_frame.pack(padx=20, pady=(20, 10), fill="x")
 
-        icon_img = CTkImage(Image.open(Path(__file__).parent / "logo.png"), size=(64, 64))
+        icon_img = CTkImage(logo_image, size=(64, 64))
         icon_label = CTkLabel(top_frame, image=icon_img, text="")
         icon_label.grid(row=0, column=0, padx=(0, 20), sticky="w")
 
@@ -424,11 +428,11 @@ class App(CTk):
 
     def __init__(self):
         super().__init__()
-        ThemeManager.theme["CTkFont"] = CTkFont("SIMHEI", 15)
 
         # Title & Icon
         self.title("Rotaeno Stablizer")
-        icon = tkinter.PhotoImage(file=Path(__file__).parent / "logo.png")
+        with resources.files("rotaeno_stablizer").joinpath("logo.png").open("rb") as f:
+            icon = ImageTk.PhotoImage(Image.open(f).copy())
         self.wm_iconbitmap()
         self.iconphoto(True, icon)
 
