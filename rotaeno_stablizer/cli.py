@@ -10,13 +10,13 @@ from .utils import ask_confirm
 
 def ui():
 
-    input_file = Path(Prompt.ask("请输入原始文件"))
-    if config_data['other']['ask_for_output']:
-        output_file = Path(Prompt.ask("请输入原始文件"))
-    else:
-        output_file = input_file.with_stem(
-            config_data['other']['default_output_filename'].format(input_file.stem))
-        rprint("输出文件：", f"[bold yellow]{output_file}")
+    input_file = Path(Prompt.ask("请输入原始文件名称："))
+    output_file = Prompt.ask("请给出输出文件（如不需要，请直接回车）：")
+    output_file = Path(output_file) if output_file != "" else None
+    output_mask = Prompt.ask("请给出输出掩码（如不需要，请直接回车）：")
+    output_mask = Path(output_mask) if output_mask != "" else None
+    output_cmd = Prompt.ask("请给出输出旋转信息（如不需要，请直接回车）：")
+    output_cmd = Path(output_cmd) if output_cmd != "" else None
 
     config_data["video"]["rotation_version"] = IntPrompt.ask(
         "请选择直播模式版本",
@@ -28,8 +28,6 @@ def ui():
         "是否使用圆形切环", default=config_data["video"]["circle_crop"])
     config_data["video"]["display_all"] = ask_confirm(
         "是否输出正方形版本", default=config_data["video"]["display_all"])
-    config_data["video"]["auto_crop"] = ask_confirm(
-        "是否自动裁切成16:9", default=config_data["video"]["auto_crop"])
     config_data["video"]["background_need"] = ask_confirm(
         "是否需要背景图片", default=config_data["video"]["background_need"])
     if config_data["video"]["background_need"]:
@@ -52,5 +50,9 @@ def ui():
                       display_all=config_data["video"]["display_all"],
                       background=config_data["video"]["background"],
                       height=config_data["video"]["height"])
-    rotaeno.run(input_file, output_file, config_data["codec"]["encoder"],
-                config_data["codec"]["bitrate"])
+    rotaeno.run(input_video=input_file,
+                output_video=output_file,
+                output_mask=output_mask,
+                output_cmd=output_cmd,
+                encoder=config_data["codec"]["encoder"],
+                bitrate=config_data["codec"]["bitrate"])
