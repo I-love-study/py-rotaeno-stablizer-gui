@@ -41,7 +41,14 @@ if __name__ == "__main__":
                                      formatter_class=ArgumentDefaultsHelpFormatter,
                                      add_help=False)
     parser.add_argument('-h', '--help', help='帮助', action='store_true')
+    parser.add_argument()
     parser.add_argument("-o", "--output-video", type=str, default=None)
+
+    parser.add_argument("--video-output",
+                        action=argparse.BooleanOptionalAction,
+                        default=config_data["video"]["video_output"],
+                        help="输出视频"
+    )
     parser.add_argument("--rotation-version", type=int, default=2, help="直播模式版本")
     parser.add_argument("-bg", "--background", type=str, help="歌曲封面照片路径")
     parser.add_argument("--auto-crop",
@@ -77,20 +84,21 @@ if __name__ == "__main__":
                         type=str,
                         default=config_data["other"]["loglevel"],
                         help="输出视频码率（不包含音频）")
+
     parser.add_argument("--mask-output",
                         action=argparse.BooleanOptionalAction,
                         default=config_data["video"]["mask_output"],
-                        help="同时输出掩码"
+                        help="输出掩码"
     )
     parser.add_argument("--mask-path",
                         type=str,
                         default=None,
-                        help="掩码视频路径，默认为输出文件 + '_mask'"
+                        help="掩码视频路径，默认为输出文件 + '_mask'，如果已填写，默认输出"
     )
     parser.add_argument("--cmd-output",
                         action=argparse.BooleanOptionalAction,
                         default=config_data["video"]["cmd_output"],
-                        help="输出 ffmpeg 命令，以及对应的旋转信息"
+                        help="输出 ffmpeg 命令，以及对应的旋转信息，如果已填写，默认输出"
     )
     parser.add_argument("--cmd-path",
                         type=str,
@@ -111,8 +119,34 @@ if __name__ == "__main__":
     if args.help:
         parser.print_help()
     elif args.input_video is None:
+        # TODO: auto downgrade to cli when no have display
         (cli if args.cli else gui)()
     else:
+        input_video = Path(args.input_video)
+
+        if args.output_video is not None:
+            output_video = Path(args.output_video)
+        elif not args.cmd_output:
+            cmd_path = None
+        else:
+            cmd_path = (
+                input_video.with_stem(f"{input_video.stem}_out"))
+
+        if args.cmd_path is not None:
+            cmd_path = Path(args.cmd_path)
+        elif not args.cmd_output:
+            cmd_path = None
+        else:
+            cmd_path = (
+                input_video.with_stem(f"{input_video.stem}_rotate").with_suffix(".cmd"))
+
+        if args.mask_path is not None:
+            mask_path = Path(args.mask_path)
+        elif not args.mask_output:
+            mask_path = None
+        else:
+            mask_path = input_video.with_stem(f"{input_video.stem}_mask")
+
         logging.getLogger("rich").setLevel(args.loglevel.upper())
         rotaeno = Rotaeno(rotation_version=args.rotation_version,
                           circle_crop=args.circle_crop,
@@ -121,10 +155,11 @@ if __name__ == "__main__":
                           background=args.background,
                           height=args.height)
 
-        input_video = Path(args.input_video)
         rotaeno.run(input_video=input_video,
-                    output_video=input_video.with_stem(input_video.stem + "_out")
-                    if args.output_video is None else args.output_video,
+                    output_video=output_video,
+                    output_mask=mask_path,
+                    output_cmd=cmd_path,
                     encoder=args.encoder if args.encoder else None,
                     decoder=args.decoder if args.encoder else None,
-                    bitrate=args.bitrate)
+                    bitrate=args.bitrate,
+                    )

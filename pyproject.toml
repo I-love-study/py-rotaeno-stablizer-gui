@@ -9,8 +9,8 @@ dependencies = [
     "rtoml>=0.11.0; python_version<\"3.11\""
 ]
 description = "Default template for PDM package"
-license = {text = "LGPL-3.0"}
-name = "py-rotaeno-stablizer-gui"
+license = "LGPL-3.0-or-later"
+name = "rotaeno-stablizer"
 readme = "README.md"
 requires-python = ">=3.10"
 version = "0.2.0"
@@ -20,6 +20,7 @@ dev = [
     "viztracer>=0.16.2", # performance
     "nuitka>=2.1.3", # packaging
     "yapf>=0.40.2", # formatter
+    "imageio>=2.37.0" # package icon
 ]
 
 [project.optional-dependencies]
@@ -29,5 +30,18 @@ gui = [
     "CTkMessagebox>=2.7"
 ]
 
+[options]
+include_package_data = true
+
+[options.package_data]
+rotation_stablizer = ["rotaeno_stablizer/*.png"]
+
 [tool.pdm]
 distribution = true
+
+[tool.pdm.build]
+includes = ["rotaeno_stablizer"]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
