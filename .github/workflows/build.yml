@@ -35,9 +35,14 @@ jobs:
         architecture: 'x64'
 
     - name: Install dependencies
+      run: pdm install
+
+    - name: Activate PDM virtual environment
       run: |
-        pdm config python.use_venv false
-        pdm install
+        echo "Activating PDM virtual environment"
+        eval "$(pdm venv activate)"
+        echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
+        echo "PATH=$PATH" >> $GITHUB_ENV
 
     - uses: Nuitka/Nuitka-Action@main
       with:
