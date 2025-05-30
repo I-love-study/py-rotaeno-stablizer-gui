@@ -13,12 +13,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-
-    - name: Checkout opencv-python
-      uses: actions/checkout@v4
-      with:
-        repository: opencv/opencv-python
-        path: opencv-python
   
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v2
@@ -39,7 +33,7 @@ jobs:
         nuitka-version: main
         script-name: rotaeno_stablizer
         mode: standalone
-        enable-plugins: upx, tk-inter
+        enable-plugins: upx,tk-inter
         lto: yes
         python-flag: -m
         include-data-files: rotaeno_stablizer/*.png=rotaeno_stablizer/
