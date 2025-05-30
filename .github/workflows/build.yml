@@ -37,24 +37,21 @@ jobs:
     - name: Install dependencies
       run: pdm install
 
-    - name: Activate PDM virtual environment
+    - name: Build Standalone
       run: |
-        echo "Activating PDM virtual environment"
-        eval "$(pdm venv activate)"
-        echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
-        echo "PATH=$PATH" >> $GITHUB_ENV
+        pdm run nuitka --standalone rotaeno_stablizer --output-dir=build --python-flag=-m --plugin-enable=upx,tk-inter --lto=yes --include-data-files=rotaeno_stablizer/*.png=rotaeno_stablizer/ --windows-icon-from-ico=rotaeno_stablizer/logo.png --include-package-data=CTkMessagebox
 
-    - uses: Nuitka/Nuitka-Action@main
-      with:
-        nuitka-version: main
-        script-name: rotaeno_stablizer
-        mode: standalone
-        enable-plugins: upx,tk-inter
-        lto: yes
-        python-flag: -m
-        include-data-files: rotaeno_stablizer/*.png=rotaeno_stablizer/
-        include-package-data: CTkMessagebox
-        windows-icon-from-ico: rotaeno_stablizer/logo.png
+    # - uses: Nuitka/Nuitka-Action@main
+    #   with:
+    #     nuitka-version: main
+    #     script-name: rotaeno_stablizer
+    #     mode: standalone
+    #     enable-plugins: upx,tk-inter
+    #     lto: yes
+    #     python-flag: -m
+    #     include-data-files: rotaeno_stablizer/*.png=rotaeno_stablizer/
+    #     include-package-data: CTkMessagebox
+    #     windows-icon-from-ico: rotaeno_stablizer/logo.png
 
     - name: Copy config.toml to dist
       run: |
