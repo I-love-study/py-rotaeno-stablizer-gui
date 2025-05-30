@@ -41,7 +41,6 @@ if __name__ == "__main__":
                                      formatter_class=ArgumentDefaultsHelpFormatter,
                                      add_help=False)
     parser.add_argument('-h', '--help', help='帮助', action='store_true')
-    parser.add_argument()
     parser.add_argument("-o", "--output-video", type=str, default=None)
 
     parser.add_argument("--video-output",

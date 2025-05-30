@@ -1,6 +1,7 @@
 from functools import wraps
 from importlib import resources
 from pathlib import Path
+import sys
 from tkinter.filedialog import askopenfilename
 from typing import Callable
 from webbrowser import open as webopen
@@ -488,7 +489,7 @@ def main():
         app.destroy()
 
     if not app.start_run:
-        exit()
+        sys.exit()
 
     circle_crop = app.option_frame.circle_crop
     auto_crop = app.option_frame.auto_crop
