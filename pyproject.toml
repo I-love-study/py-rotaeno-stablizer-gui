@@ -27,7 +27,8 @@ dev = [
 gui = [
     "customtkinter>=5.2.2",
     "CTkTable>=1.1",
-    "CTkMessagebox>=2.7"
+    "CTkMessagebox>=2.7",
+    "CTkMenuBar>=0.8"
 ]
 
 [options]
