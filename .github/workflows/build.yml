@@ -39,7 +39,7 @@ jobs:
 
     - name: Build Standalone
       run: |
-        pdm run nuitka --standalone rotaeno_stablizer --output-dir=build --python-flag=-m --plugin-enable=upx,tk-inter --lto=yes --include-data-files=rotaeno_stablizer/*.png=rotaeno_stablizer/ --windows-icon-from-ico=rotaeno_stablizer/logo.png --include-package-data=CTkMessagebox
+        pdm run nuitka --standalone rotaeno_stablizer --output-dir=build --python-flag=-m --plugin-enable=upx,tk-inter --lto=yes --include-data-files=rotaeno_stablizer/*.png=rotaeno_stablizer/ --windows-icon-from-ico=rotaeno_stablizer/logo.png --include-package-data=CTkMessagebox --assume-yes-for-downloads
 
     # - uses: Nuitka/Nuitka-Action@main
     #   with:
