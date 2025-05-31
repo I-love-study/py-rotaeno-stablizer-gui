@@ -1,0 +1,24 @@
+repos:
+  - repo: https://github.com/pdm-project/pdm
+    rev: 2.x.y  # 替换成你需要的版本号
+    hooks:
+      - id: pdm-export
+        name: Export requirements.txt
+        args:
+          - -o
+          - requirements.txt
+          - --prod
+          - --without-hashes
+          - --pyproject
+        files: ^pdm.lock$
+      - id: pdm-export
+        name: Export requirements_gui.txt
+        args:
+          - -o
+          - requirements_gui.txt
+          - --prod
+          - --without-hashes
+          - --pyproject
+          - --with
+          - gui
+        files: ^pdm.lock$
