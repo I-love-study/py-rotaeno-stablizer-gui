@@ -45,7 +45,7 @@ jobs:
 
     - name: Turn dist to 7z file
       run: |
-        7z a -t7z rotaeno_stablizer.7z -mx=9 ./build/rotaeno_stablizer.dist
+        7z a -t7z rotaeno_stablizer_win64.7z -mx=9 ./build/rotaeno_stablizer.dist
 
     - name: Release
       uses: softprops/action-gh-release@v2
