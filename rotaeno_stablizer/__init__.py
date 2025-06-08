@@ -182,11 +182,11 @@ class Rotaeno:
 
         if not ensure_rewrite:
             checklist = [output_video, output_cmd, output_mask]
-            existlist = [c for c in checklist if c.exists()]
+            existlist = [c for c in checklist if c is not None and c.exists()]
             if existlist:
                 rprint(f"输出文件已存在：{', '.join(map(str, existlist))}")
-            if not ask_confirm("是否覆盖"):
-                return
+                if not ask_confirm("是否覆盖"):
+                    return
 
         progress = Progress(SpinnerColumn(),
                             TextColumn("[progress.description]{task.description}"),

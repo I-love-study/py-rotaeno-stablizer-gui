@@ -1,14 +1,16 @@
-name: Build & Publish
+name: Release Build & Publish
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+    
 
 jobs:
-  build_exe:
-    name: Build standlone
+  main_job:
+    name: Build Windows Standalone
     runs-on: windows-latest
 
     steps:
@@ -20,13 +22,6 @@ jobs:
     - name: Install UPX
       run: |
         choco install upx
-    
-    # - name: Setup Python
-    #   uses: actions/setup-python@v4
-    #   with:
-    #     python-version: '3.13'
-    #     architecture: 'x64'
-    #     cache: 'pip'
 
     - name: Setup PDM
       uses: pdm-project/setup-pdm@v4
@@ -37,21 +32,12 @@ jobs:
     - name: Install dependencies
       run: pdm install
 
+    - name: Build pypi package & publish
+      run: pdm publish
+
     - name: Build Standalone
       run: |
         pdm run nuitka --standalone rotaeno_stablizer --output-dir=build --python-flag=-m --plugin-enable=upx,tk-inter --lto=yes --include-data-files=rotaeno_stablizer/*.png=rotaeno_stablizer/ --windows-icon-from-ico=rotaeno_stablizer/logo.png --include-package-data=CTkMessagebox --assume-yes-for-downloads
-
-    # - uses: Nuitka/Nuitka-Action@main
-    #   with:
-    #     nuitka-version: main
-    #     script-name: rotaeno_stablizer
-    #     mode: standalone
-    #     enable-plugins: upx,tk-inter
-    #     lto: yes
-    #     python-flag: -m
-    #     include-data-files: rotaeno_stablizer/*.png=rotaeno_stablizer/
-    #     include-package-data: CTkMessagebox
-    #     windows-icon-from-ico: rotaeno_stablizer/logo.png
 
     - name: Copy config.toml to dist
       run: |
@@ -61,7 +47,7 @@ jobs:
       run: |
         7z a -t7z rotaeno_stablizer.7z -mx=9 ./build/rotaeno_stablizer.dist
 
-    - uses: actions/upload-artifact@v4
+    - name: Release
+      uses: softprops/action-gh-release@v2
       with:
-        name: Rotaeno Stablizer
-        path: ./rotaeno_stablizer.7z
+        files: ./rotaeno_stablizer_win64.7z
