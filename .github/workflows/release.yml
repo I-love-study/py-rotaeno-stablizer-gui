@@ -12,6 +12,9 @@ jobs:
   main_job:
     name: Build Windows Standalone
     runs-on: windows-latest
+    permissions:
+      id-token: write   # 允许 OIDC token 认证
+      contents: write   # 允许读写仓库内容
 
     steps:
     - uses: actions/checkout@v4
