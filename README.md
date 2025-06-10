@@ -14,11 +14,11 @@ Rotaeno 录屏稳定器
 
 浅色：
 
-![interface](docs_image/interface_white.png)
+![interface](./docs_image/interface_white.png)
 
 暗色：
 
-![interface](docs_image/interface.png)
+![interface](./docs_image/interface.png)
 
 Encoder Info:
 
@@ -47,11 +47,11 @@ Codec check:
 
 |       操作       |          语法           |                                 效果                                  |
 | :--------------: | :---------------------: | :-------------------------------------------------------------------: |
-|     默认效果     |            -            |         <details>![normal](docs_image/normal.avif)</details>          |
-|   添加音乐封面   | -bg / --background-path | <details>![with_background](docs_image/with_backgrond.avif)</details> |
-|  不进行自动裁切  |     --no-auto-crop      |   <details>![no_auto_crop](docs_image/no_auto_crop.avif)</details>    |
-|  不进行圆形裁切  |    --no-circle-crop     | <details>![no_circle_crop](docs_image/no_circle_crop.avif)</details>  |
-| 不输出正方形版本 |    --no-display-all     | <details>![no_display_all](docs_image/no_display_all.avif)</details>  |
+|     默认效果     |            -            |         <details>![normal](./docs_image/normal.avif)</details>          |
+|   添加音乐封面   | -bg / --background-path | <details>![with_background](./docs_image/with_backgrond.avif)</details> |
+|  不进行自动裁切  |     --no-auto-crop      |   <details>![no_auto_crop](./docs_image/no_auto_crop.avif)</details>    |
+|  不进行圆形裁切  |    --no-circle-crop     | <details>![no_circle_crop](./docs_image/no_circle_crop.avif)</details>  |
+| 不输出正方形版本 |    --no-display-all     | <details>![no_display_all](./docs_image/no_display_all.avif)</details>  |
 
 ## 安装
 

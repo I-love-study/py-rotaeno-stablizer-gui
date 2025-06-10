@@ -32,6 +32,10 @@ jobs:
     - name: Install dependencies
       run: pdm install
 
+    # 将 README.md 中的相对路径转换为绝对路径
+    - name: Turn reletive link to absolute link in README
+      run: python readme_url_replace.py
+
     - name: Build pypi package & publish
       run: pdm publish --skip-existing
 
