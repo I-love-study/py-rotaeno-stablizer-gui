@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pdm-project/pdm
-    rev: 2.24.2  # 替换成你需要的版本号
+    rev: 2.24.2
     hooks:
       - id: pdm-export
         name: Export requirements.txt
@@ -12,7 +12,7 @@ repos:
           - --pyproject
         files: ^pdm.lock$        
         pass_filenames: false
-        stages: [commit]
+        stages: [pre-commit]
       - id: pdm-export
         name: Export requirements_gui.txt
         args:
@@ -25,4 +25,4 @@ repos:
           - gui
         files: ^pdm.lock$    
         pass_filenames: false
-        stages: [commit]
+        stages: [pre-commit]
