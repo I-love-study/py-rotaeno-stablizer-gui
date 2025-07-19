@@ -49,4 +49,3 @@ if __name__ == "__main__":
     new_content = convert_relative_links(content)
     #readme_path = Path("README_NEW.md")
     readme_path.write_text(new_content, encoding="utf-8")
-    print("✅ 相对链接转换完成")
