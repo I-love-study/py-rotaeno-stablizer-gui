@@ -13,7 +13,7 @@ license = "LGPL-3.0-or-later"
 name = "rotaeno-stablizer"
 readme = "README.md"
 requires-python = ">=3.10"
-version = "1.0.0"
+version = "1.0.1"
 
 [dependency-groups]
 dev = [
