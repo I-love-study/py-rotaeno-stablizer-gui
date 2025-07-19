@@ -463,9 +463,20 @@ class App(CTk):
 
     @raise_messagebox()
     def start(self):
-        out_path = Path(self.path_frame.output_video)
-        if out_path.exists() and not self.path_frame.force_rewrite:
-            msg = CTkMessagebox(title="输出路径已存在\n是否覆盖",
+        warning_bar = [
+            [self.path_frame.need_output_video, self.path_frame.output_video],
+            [self.path_frame.need_mask_video, self.path_frame.mask_video],
+            [self.path_frame.need_output_cmd_data, self.path_frame.output_cmd_data],
+        ]
+        warning_message = []
+        for get, p in warning_bar:
+            if get and Path(p).exists() and not self.path_frame.force_rewrite:
+                warning_message.append(p)
+        
+        if warning_message:
+            msg = CTkMessagebox(title="警告",
+                message=f"输出路径{'，'.join(warning_message)}已存在\n是否覆盖",
+                                width=600,
                                 icon="question",
                                 option_1="Yes",
                                 option_2="False")
@@ -505,7 +516,8 @@ def main(args):
     encoder = app.codec_frame.encoder
     decoder = app.codec_frame.decoder
     bitrate = app.codec_frame.bitrate
-    fps = float(app.codec_frame.fps)
+    fps = app.codec_frame.fps
+    fps = None if fps == "" else float(fps)
     
     background = app.path_frame.cover
     input_video = app.path_frame.input_video
@@ -527,8 +539,7 @@ def main(args):
 
     input_video = Path(input_video)
     rotaeno.run(input_video=input_video,
-                output_video=input_video.with_stem(input_video.stem + "_out")
-                if output_video is None else output_video,
+                output_video=output_video,
                 encoder=encoder if encoder else None,
                 decoder=decoder if decoder else None,
                 bitrate=bitrate if bitrate else None,
