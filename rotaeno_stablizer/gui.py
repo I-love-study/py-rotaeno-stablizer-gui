@@ -258,10 +258,10 @@ class CodecFrame(CTkFrame):
         inner.grid_columnconfigure(list(range(3)), pad=15)
         inner.grid_rowconfigure(list(range(6)), pad=15)
 
-        CTkLabel(inner, text="Decoder").grid(row=0, column=0, sticky="W")
+        CTkLabel(inner, text="Encoder").grid(row=0, column=0, sticky="W")
         CTkEntry(inner, width=100, textvariable=self.encoder_).grid(row=0, column=1)
 
-        CTkLabel(inner, text="Encoder").grid(row=1, column=0, sticky="W")
+        CTkLabel(inner, text="Decoder").grid(row=1, column=0, sticky="W")
         CTkEntry(inner, width=100, textvariable=self.decoder_).grid(row=1, column=1)
 
         CTkLabel(inner, text="Bitrate").grid(row=2, column=0, sticky="W")
@@ -474,19 +474,24 @@ class App(CTk):
         self.start_run = True
         self.destroy()
 
-def main():
+def main(args):
     app = App()
     ThemeManager.theme["CTkFont"] = CTkFont("Sarasa UI SC", 15)
-    result = CTkMessagebox(None,
-                           title="注意",
-                           message="这并不是官方制作的视频稳定器。如有问题，请及时反馈。",
-                           icon="warning",
-                           option_1="不是？我不用了！",
-                           option_2="我已知晓").get()
-    if result == "我已知晓":
-        app.mainloop()
+    if args is not None:
+        show_warning = args.show_warning
     else:
-        app.destroy()
+        show_warning = config_data["other"].get("show_warning", True)
+    if show_warning:
+        result = CTkMessagebox(None,
+                            title="注意",
+                            message="这并不是官方制作的视频稳定器。如有问题，请及时反馈。",
+                            icon="warning",
+                            option_1="不是？我不用了！",
+                            option_2="我已知晓").get()
+        if result != "我已知晓":
+            app.destroy()
+            sys.exit()
+    app.mainloop()
 
     if not app.start_run:
         sys.exit()
@@ -500,7 +505,8 @@ def main():
     encoder = app.codec_frame.encoder
     decoder = app.codec_frame.decoder
     bitrate = app.codec_frame.bitrate
-
+    fps = float(app.codec_frame.fps)
+    
     background = app.path_frame.cover
     input_video = app.path_frame.input_video
     need_output_video = app.path_frame.need_output_video
@@ -516,7 +522,8 @@ def main():
                       auto_crop=auto_crop,
                       display_all=display_all,
                       background=background if background else None,
-                      height=height)
+                      height=height,
+                      fps=fps if fps else None)
 
     input_video = Path(input_video)
     rotaeno.run(input_video=input_video,
@@ -524,7 +531,7 @@ def main():
                 if output_video is None else output_video,
                 encoder=encoder if encoder else None,
                 decoder=decoder if decoder else None,
-                bitrate=bitrate if decoder else None,
+                bitrate=bitrate if bitrate else None,
                 ensure_rewrite=True,
                 output_mask=output_mask,
                 output_cmd=output_cmd,

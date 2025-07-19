@@ -114,13 +114,20 @@ if __name__ == "__main__":
                        action="store_true",
                        default=config_data["other"]["default_gui"],
                        help="使用 cli 界面")
+    parser.add_argument("--show-warning",
+                        action=argparse.BooleanOptionalAction,
+                       default=config_data["other"]["show_warning"],
+                       help="是否展示非官方警告")
     parser.add_argument("input_video", type=str, default=None, nargs='?')
     args = parser.parse_args()
     if args.help:
         parser.print_help()
     elif args.input_video is None:
         # TODO: auto downgrade to cli when no have display
-        (cli if args.cli else gui)()
+        if args.cli:
+            cli()
+        else:
+            gui(args)
     else:
         input_video = Path(args.input_video)
 

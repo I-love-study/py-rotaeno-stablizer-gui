@@ -34,12 +34,12 @@ class Rotaeno:
                  auto_crop: bool = True,
                  display_all: bool = True,
                  height: int | None = None,
-                 background: str | PathLike | None = None,
-                 mask_mode: bool = False):
-        """_summary_
+                 background: str | PathLike | None = None):
+        """__init__，用于创建实例，需传入输出视频的部分信息
 
         Args:
             rotation_version (int, optional): 使用串流版本. Defaults to 2.
+            fps (int, optional): 帧率，None 则表示使用原帧率
             circle_crop (bool, optional): 是否采用圆形裁切，裁切后，视频将会变为 16:9. Defaults to True.
             auto_crop (bool, optional): 将输入视频裁切成 16:9. Defaults to True.
             display_all (bool, optional): 是否适当缩小视频以保证所有都能看到，开启后视频比例会变为 1:1. Defaults to True.

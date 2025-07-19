@@ -27,7 +27,8 @@ decoder = ""
 ask_for_config = true # 在直接运行时，是否询问、
 ask_for_output = false # 是否需要询问输出文件
 loglevel = "info" # 日志等级
-default_gui = true # （无参数情况下）启用 GUI 界面"""
+default_gui = true # （无参数情况下）启用 GUI 界面
+show_warning = true # 展示非官方警告"""
 
 config_path = Path("config.toml")
 config_data = tomllib.loads(
