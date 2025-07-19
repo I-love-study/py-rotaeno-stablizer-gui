@@ -41,6 +41,7 @@ if __name__ == "__main__":
                                      formatter_class=ArgumentDefaultsHelpFormatter,
                                      add_help=False)
     parser.add_argument('-h', '--help', help='帮助', action='store_true')
+
     parser.add_argument("-o", "--output-video", type=str, default=None)
 
     parser.add_argument("--video-output",
@@ -82,7 +83,7 @@ if __name__ == "__main__":
     parser.add_argument("--loglevel",
                         type=str,
                         default=config_data["other"]["loglevel"],
-                        help="输出视频码率（不包含音频）")
+                        help="日志等级")
 
     parser.add_argument("--mask-output",
                         action=argparse.BooleanOptionalAction,
