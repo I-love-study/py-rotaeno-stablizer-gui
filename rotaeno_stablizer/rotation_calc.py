@@ -55,7 +55,7 @@ class RotationCalc:
             if i > 127.5:
                 color_to_degree += mul_num
             mul_num *= 2
-        rotation_degree = color_to_degree / 4096 * 360
+        rotation_degree = color_to_degree / 4096 * -360
 
         return rotation_degree
 
@@ -110,7 +110,8 @@ class RotationCalc:
         ts = []
         while pipe.poll() is None:
             frame = stdout.read(frame_size)
-            if frame == b"": break
+            if frame == b"":
+                break
             a = time.time()
             rotate = self.method(list(frame))
             ts.append(time.time() - a)
