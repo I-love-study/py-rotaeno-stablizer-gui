@@ -44,10 +44,10 @@ def get_ffmpeg():
 
 def get_ffprobe():
     """获取本机拥有的编解码器"""
-    if which("ffprobe"):
+    if Path("./ffprobe.exe").exists():
+        return "./ffprobe.exe"
+    elif which("ffprobe"):
         return "ffprobe"
-    elif Path("ffmpeg/bin/ffprobe.exe").exists():
-        return "ffmpeg/bin/ffprobe.exe"
 
     Warning("Couldn't find ffprobe, maybe it'll not work")
     return "ffprobe"
