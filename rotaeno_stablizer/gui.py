@@ -527,8 +527,6 @@ def main(args):
     output_video = app.path_frame.output_video if need_output_video else None
     output_mask = app.path_frame.mask_video if need_output_mask else None
     output_cmd = app.path_frame.output_cmd_data if need_output_cmd_data else None
-    import logging
-    logging.getLogger("rich").setLevel("DEBUG")
     rotaeno = Rotaeno(rotation_version=rotation_version,
                       circle_crop=circle_crop,
                       auto_crop=auto_crop,
