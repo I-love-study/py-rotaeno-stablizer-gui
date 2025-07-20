@@ -32,10 +32,11 @@ def gpu_perfer_order(coders: list[str]):
 
 def get_ffmpeg():
     """获取本机拥有的编解码器"""
-    if which("ffmpeg"):
+    # Use FFMpeg Under path first
+    if Path("./ffmpeg.exe").exists():
+        return "./ffmpeg.exe"
+    elif which("ffmpeg"):
         return "ffmpeg"
-    elif Path("ffmpeg/bin/ffmpeg.exe").exists():
-        return "ffmpeg/bin/ffmpeg.exe"
 
     Warning("Couldn't find ffmpeg, maybe it'll not work")
     return "ffmpeg"
